@@ -6,6 +6,7 @@ import {
   TextInput,
   TouchableOpacity,
   KeyboardAvoidingView,
+  ScrollView,
   Platform,
   Alert,
   Animated,
@@ -15,6 +16,7 @@ import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { useAuth } from '../contexts/AuthContext';
+import { wp, hp, RFValue, spacing, fontSize, borderRadius, iconSize, isSmallDevice, isLargeDevice } from '../utils/responsive';
 
 const { width, height } = Dimensions.get('window');
 
@@ -98,8 +100,13 @@ export default function ForgotPasswordScreen({ navigation }) {
         style={styles.keyboardContainer}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        {/* Header */}
-        <Animated.View 
+        <ScrollView 
+          contentContainerStyle={styles.scrollContainer}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Header */}
+          <Animated.View 
           style={[
             styles.header,
             {
@@ -175,6 +182,7 @@ export default function ForgotPasswordScreen({ navigation }) {
             </View>
           </BlurView>
         </Animated.View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </LinearGradient>
   );
@@ -197,6 +205,10 @@ const styles = StyleSheet.create({
   },
   keyboardContainer: {
     flex: 1,
+    justifyContent: 'space-between',
+  },
+  scrollContainer: {
+    flexGrow: 1,
     justifyContent: 'space-between',
   },
   header: {

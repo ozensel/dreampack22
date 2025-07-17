@@ -6,16 +6,19 @@ import {
   TextInput,
   TouchableOpacity,
   KeyboardAvoidingView,
+  ScrollView,
   Platform,
   Alert,
   Animated,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { wp, hp, RFValue, spacing, fontSize, borderRadius, iconSize, isSmallDevice, isLargeDevice } from '../utils/responsive';
 
 const { width, height } = Dimensions.get('window');
 
@@ -25,6 +28,9 @@ export default function LoginScreen({ navigation }) {
   const [isLoading, setIsLoading] = useState(false);
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
+  const [emailError, setEmailError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   
   const { signIn } = useAuth();
   const { t } = useLanguage();
@@ -53,22 +59,80 @@ export default function LoginScreen({ navigation }) {
     ]).start();
   }, []);
 
+  const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const handleEmailChange = (text) => {
+    setEmail(text);
+    if (text.trim() && !validateEmail(text.trim())) {
+      setEmailError('Geçerli bir e-posta adresi girin');
+    } else {
+      setEmailError('');
+    }
+  };
+
+  const handlePasswordChange = (text) => {
+    setPassword(text);
+    if (text && text.length < 6) {
+      setPasswordError('Şifre en az 6 karakter olmalıdır');
+    } else {
+      setPasswordError('');
+    }
+  };
+
   const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Hata', 'Lütfen tüm alanları doldurun.');
+    // Input validasyonu
+    if (!email.trim()) {
+      Alert.alert('Hata', 'Lütfen e-posta adresinizi girin.');
+      return;
+    }
+
+    if (!validateEmail(email.trim())) {
+      Alert.alert('Hata', 'Lütfen geçerli bir e-posta adresi girin.');
+      return;
+    }
+
+    if (!password) {
+      Alert.alert('Hata', 'Lütfen şifrenizi girin.');
+      return;
+    }
+
+    if (password.length < 6) {
+      Alert.alert('Hata', 'Şifre en az 6 karakter olmalıdır.');
       return;
     }
 
     setIsLoading(true);
     
-    const result = await signIn(email, password);
-    
-    setIsLoading(false);
-    
-    if (result.success) {
-      // AuthContext otomatik olarak Home'a yönlendirecek
-    } else {
-      Alert.alert('Giriş Hatası', result.error || 'Giriş yapılamadı.');
+    try {
+      const result = await signIn(email.trim().toLowerCase(), password);
+      
+      if (result.success) {
+        // AuthContext otomatik olarak Home'a yönlendirecek
+      } else {
+        // Daha anlaşılır hata mesajları
+        let errorMessage = 'Giriş yapılamadı.';
+        
+        if (result.error) {
+          if (result.error.includes('Invalid login credentials')) {
+            errorMessage = 'E-posta veya şifre hatalı. Lütfen tekrar deneyin.';
+          } else if (result.error.includes('Email not confirmed')) {
+            errorMessage = 'E-posta adresinizi doğrulamanız gerekiyor. Lütfen e-posta kutunuzu kontrol edin.';
+          } else if (result.error.includes('Too many requests')) {
+            errorMessage = 'Çok fazla deneme yapıldı. Lütfen birkaç dakika sonra tekrar deneyin.';
+          } else {
+            errorMessage = result.error;
+          }
+        }
+        
+        Alert.alert('Giriş Hatası', errorMessage);
+      }
+    } catch (error) {
+      Alert.alert('Hata', 'Bir hata oluştu. Lütfen internet bağlantınızı kontrol edin.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -101,8 +165,13 @@ export default function LoginScreen({ navigation }) {
         style={styles.keyboardContainer}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        {/* Header */}
-        <Animated.View 
+        <ScrollView 
+          contentContainerStyle={styles.scrollContainer}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Header */}
+          <Animated.View 
           style={[
             styles.header,
             {
@@ -136,11 +205,11 @@ export default function LoginScreen({ navigation }) {
               {/* Email Input */}
               <View style={styles.inputContainer}>
                 <Text style={styles.label}>{t('auth.email')}</Text>
-                <View style={[styles.inputWrapper, emailFocused && styles.inputWrapperFocused]}>
+                <View style={[styles.inputWrapper, emailFocused && styles.inputWrapperFocused, emailError && styles.inputWrapperError]}>
                   <TextInput
                     style={styles.input}
                     value={email}
-                    onChangeText={setEmail}
+                    onChangeText={handleEmailChange}
                     placeholder={t('auth.emailPlaceholder')}
                     placeholderTextColor="rgba(255,255,255,0.6)"
                     keyboardType="email-address"
@@ -150,24 +219,32 @@ export default function LoginScreen({ navigation }) {
                     onBlur={() => setEmailFocused(false)}
                   />
                 </View>
+                {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
               </View>
 
               {/* Password Input */}
               <View style={styles.inputContainer}>
                 <Text style={styles.label}>{t('auth.password')}</Text>
-                <View style={[styles.inputWrapper, passwordFocused && styles.inputWrapperFocused]}>
+                <View style={[styles.inputWrapper, passwordFocused && styles.inputWrapperFocused, passwordError && styles.inputWrapperError]}>
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, { flex: 1 }]}
                     value={password}
-                    onChangeText={setPassword}
+                    onChangeText={handlePasswordChange}
                     placeholder={t('auth.passwordPlaceholder')}
                     placeholderTextColor="rgba(255,255,255,0.6)"
-                    secureTextEntry
+                    secureTextEntry={!showPassword}
                     autoCapitalize="none"
                     onFocus={() => setPasswordFocused(true)}
                     onBlur={() => setPasswordFocused(false)}
                   />
+                  <TouchableOpacity
+                    style={styles.eyeButton}
+                    onPress={() => setShowPassword(!showPassword)}
+                  >
+                    <Text style={styles.eyeIcon}>{showPassword ? '👁️' : '👁️‍🗨️'}</Text>
+                  </TouchableOpacity>
                 </View>
+                {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
               </View>
 
               {/* Forgot Password */}
@@ -189,9 +266,18 @@ export default function LoginScreen({ navigation }) {
                   colors={isLoading ? ['#9CA3AF', '#6B7280'] : ['rgba(255,255,255,0.9)', 'rgba(255,255,255,0.7)']}
                   style={styles.loginButtonGradient}
                 >
-                  <Text style={[styles.loginButtonText, isLoading && styles.loginButtonTextDisabled]}>
-                    {isLoading ? t('auth.signingIn') : t('auth.signIn')}
-                  </Text>
+                  {isLoading ? (
+                    <View style={styles.loadingContainer}>
+                      <ActivityIndicator size="small" color="white" />
+                      <Text style={[styles.loginButtonText, styles.loginButtonTextDisabled, { marginLeft: 10 }]}>
+                        {t('auth.signingIn')}
+                      </Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.loginButtonText}>
+                      {t('auth.signIn')}
+                    </Text>
+                  )}
                 </LinearGradient>
               </TouchableOpacity>
 
@@ -205,6 +291,7 @@ export default function LoginScreen({ navigation }) {
             </View>
           </BlurView>
         </Animated.View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </LinearGradient>
   );
@@ -229,18 +316,22 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'space-between',
   },
+  scrollContainer: {
+    flexGrow: 1,
+    justifyContent: 'space-between',
+  },
   header: {
     alignItems: 'center',
-    paddingTop: Platform.OS === 'ios' ? 80 : 60,
-    paddingBottom: 40,
+    paddingTop: Platform.OS === 'ios' ? (isLargeDevice() ? hp(12) : hp(10)) : hp(8),
+    paddingBottom: hp(5),
   },
   logoContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: wp(25),
+    height: wp(25),
+    borderRadius: wp(12.5),
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: hp(2.5),
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -251,19 +342,19 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   logo: {
-    fontSize: 50,
+    fontSize: RFValue(50),
   },
   title: {
-    fontSize: 36,
+    fontSize: RFValue(36),
     fontWeight: 'bold',
     color: 'white',
-    marginBottom: 8,
+    marginBottom: hp(1),
     textShadowColor: 'rgba(0,0,0,0.3)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
   },
   subtitle: {
-    fontSize: 18,
+    fontSize: RFValue(18),
     color: 'rgba(255,255,255,0.8)',
     textAlign: 'center',
     textShadowColor: 'rgba(0,0,0,0.2)',
@@ -273,11 +364,11 @@ const styles = StyleSheet.create({
   formContainer: {
     flex: 1,
     justifyContent: 'center',
-    paddingHorizontal: 30,
-    paddingBottom: 50,
+    paddingHorizontal: wp(7.5),
+    paddingBottom: hp(6),
   },
   formBlur: {
-    borderRadius: 25,
+    borderRadius: wp(6),
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: {
@@ -289,13 +380,13 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   form: {
-    padding: 30,
+    padding: wp(7.5),
   },
   inputContainer: {
-    marginBottom: 25,
+    marginBottom: hp(3),
   },
   label: {
-    fontSize: 16,
+    fontSize: RFValue(16),
     fontWeight: '600',
     color: 'white',
     marginBottom: 8,
@@ -308,16 +399,39 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.2)',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   inputWrapperFocused: {
     borderColor: 'rgba(255,255,255,0.5)',
     backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  inputWrapperError: {
+    borderColor: 'rgba(255,100,100,0.8)',
+    backgroundColor: 'rgba(255,100,100,0.1)',
   },
   input: {
     paddingHorizontal: 20,
     paddingVertical: 15,
     fontSize: 16,
     color: 'white',
+  },
+  eyeButton: {
+    position: 'absolute',
+    right: 15,
+    top: 15,
+    padding: 5,
+  },
+  eyeIcon: {
+    fontSize: 18,
+    color: 'rgba(255,255,255,0.7)',
+  },
+  errorText: {
+    color: 'rgba(255,100,100,0.9)',
+    fontSize: RFValue(12),
+    marginTop: hp(0.5),
+    marginLeft: wp(2),
+    fontWeight: '500',
   },
   forgotPassword: {
     alignSelf: 'flex-end',
@@ -345,6 +459,11 @@ const styles = StyleSheet.create({
   loginButtonGradient: {
     paddingVertical: 18,
     alignItems: 'center',
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   loginButtonText: {
     fontSize: 18,

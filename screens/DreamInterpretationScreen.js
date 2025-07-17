@@ -23,10 +23,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { dreamService } from '../services/dreamService';
 import { supabase } from '../config/supabase';
+import { wp, hp, RFValue, spacing, fontSize, borderRadius, iconSize, isSmallDevice, isLargeDevice } from '../utils/responsive';
 
 
 const { width, height } = Dimensions.get('window');
@@ -748,9 +750,57 @@ Bu talep DreamPack uygulaması üzerinden gönderilmiştir.`;
           [{ text: 'Tamam' }]
         );
       });
-  };
+   };
 
-  const renderHomeTab = () => (
+   const handleTermsOfService = () => {
+     const termsUrl = 'https://www.iconyazilim.com/dreampack/terms-of-service';
+     
+     Linking.canOpenURL(termsUrl)
+       .then((supported) => {
+         if (supported) {
+           return Linking.openURL(termsUrl);
+         } else {
+           Alert.alert(
+             'Hata',
+             'Web sayfası açılamadı.',
+             [{ text: 'Tamam' }]
+           );
+         }
+       })
+       .catch((err) => {
+         Alert.alert(
+           'Hata',
+           'Web sayfası açılamadı.',
+           [{ text: 'Tamam' }]
+         );
+       });
+   };
+
+   const handlePrivacyPolicy = () => {
+     const privacyUrl = 'https://www.iconyazilim.com/dreampack/privacy-policy';
+     
+     Linking.canOpenURL(privacyUrl)
+       .then((supported) => {
+         if (supported) {
+           return Linking.openURL(privacyUrl);
+         } else {
+           Alert.alert(
+             'Hata',
+             'Web sayfası açılamadı.',
+             [{ text: 'Tamam' }]
+           );
+         }
+       })
+       .catch((err) => {
+         Alert.alert(
+           'Hata',
+           'Web sayfası açılamadı.',
+           [{ text: 'Tamam' }]
+         );
+       });
+   };
+
+   const renderHomeTab = () => (
     <ScrollView 
       style={styles.scrollContainer}
       showsVerticalScrollIndicator={false}
@@ -782,7 +832,7 @@ Bu talep DreamPack uygulaması üzerinden gönderilmiştir.`;
       <Animated.View style={[styles.section, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
         <BlurView intensity={20} style={styles.sectionBlur}>
           <View style={styles.sectionContent}>
-            <Text style={styles.sectionTitle}>🌙 {t('addNewDream')}</Text>
+            <Text style={styles.sectionTitle}><Ionicons name="moon" size={18} color="white" /> {t('addNewDream')}</Text>
             
             <View style={styles.inputContainer}>
               <View style={[styles.dreamInputWrapper, dreamFocused && styles.inputWrapperFocused]}>
@@ -922,7 +972,7 @@ Bu talep DreamPack uygulaması üzerinden gönderilmiştir.`;
               })
             ) : (
               <View style={styles.emptyState}>
-                <Text style={styles.emptyStateIcon}>🌙</Text>
+                <View style={styles.emptyStateIcon}><Ionicons name="moon" size={48} color="rgba(255,255,255,0.6)" /></View>
                 <Text style={styles.emptyStateText}>{t('noDreamsYet')}</Text>
                 <Text style={styles.emptyStateSubtext}>{t('addFirstDream')}</Text>
               </View>
@@ -989,162 +1039,281 @@ Bu talep DreamPack uygulaması üzerinden gönderilmiştir.`;
       <Animated.View style={[styles.section, { opacity: fadeAnim }]}>
         <BlurView intensity={20} style={styles.sectionBlur}>
           <View style={styles.sectionContent}>
-            <Text style={styles.sectionTitle}>👤 {t('profile')}</Text>
-            
-            <View style={styles.profileHeader}>
-              <View style={styles.avatarContainer}>
-                <LinearGradient
-                  colors={['#667eea', '#764ba2']}
-                  style={styles.avatar}
-                >
-                  <Text style={styles.avatarText}>
-                    {user?.email?.charAt(0).toUpperCase() || 'U'}
-                  </Text>
-                </LinearGradient>
-              </View>
-              <View style={styles.profileInfo}>
-                <Text style={styles.profileName}>
-                  {user?.user_metadata?.full_name || t('user')}
-                </Text>
-                <Text style={styles.profileEmail}>{user?.email}</Text>
-                <Text style={styles.profileJoinDate}>
-                  {t('joinDate')}: {new Date(user?.created_at).toLocaleDateString(currentLanguage === 'tr' ? 'tr-TR' : 'en-US')}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.profileStats}>
-              <View style={styles.profileStatItem}>
-                <Text style={styles.profileStatNumber}>{dreamStats.total}</Text>
-                <Text style={styles.profileStatLabel}>{t('dreams')}</Text>
-              </View>
-              <View style={styles.profileStatItem}>
-                <Text style={styles.profileStatNumber}>{Object.keys(dreamStats.categories).length}</Text>
-                <Text style={styles.profileStatLabel}>{t('categoriesLabel')}</Text>
-              </View>
-              <View style={styles.profileStatItem}>
-                <Text style={styles.profileStatNumber}>
-                  {dreamStats.total > 0 ? Math.round(dreamStats.thisWeek / dreamStats.total * 100) : 0}%
-                </Text>
-                <Text style={styles.profileStatLabel}>{t('activity')}</Text>
-              </View>
-            </View>
-
-            <TouchableOpacity 
-              style={styles.languageButton} 
-              onPress={() => setShowLanguageOptions(!showLanguageOptions)}
-            >
-              <Text style={styles.languageButtonText}>🌐 {t('language')}</Text>
-              <Text style={styles.languageArrow}>{showLanguageOptions ? '▲' : '▼'}</Text>
-            </TouchableOpacity>
-
-            {showLanguageOptions && (
-              <View style={styles.languageOptions}>
-                {[
-                  { code: 'tr', name: 'Türkçe', flag: '🇹🇷' },
-                  { code: 'id', name: 'Bahasa Indonesia', flag: '🇮🇩' },
-                  { code: 'ja', name: '日本語', flag: '🇯🇵' },
-                  { code: 'th', name: 'ไทย', flag: '🇹🇭' },
-                  { code: 'ms', name: 'Bahasa Melayu', flag: '🇲🇾' }
-                ].map((language) => (
-                  <TouchableOpacity
-                    key={language.code}
-                    style={[
-                      styles.languageOption,
-                      currentLanguage === language.code && styles.languageOptionActive
-                    ]}
-                    onPress={async () => {
-                       await changeLanguage(language.code);
-                       setShowLanguageOptions(false);
-                     }}
-                  >
-                    <Text style={styles.languageFlag}>{language.flag}</Text>
-                    <Text style={[
-                      styles.languageOptionText,
-                      currentLanguage === language.code && styles.languageOptionTextActive
-                    ]}>{language.name}</Text>
-                    {currentLanguage === language.code && (
-                      <Text style={styles.languageCheck}>✓</Text>
-                    )}
+            {/* Enhanced Profile Header */}
+            <View style={styles.enhancedProfileHeader}>
+              <LinearGradient
+                colors={['rgba(255,255,255,0.15)', 'rgba(255,255,255,0.05)']}
+                style={styles.profileHeaderGradient}
+              >
+                <View style={styles.profileHeaderContent}>
+                  <View style={styles.avatarSection}>
+                    <View style={styles.avatarWrapper}>
+                      <LinearGradient
+                        colors={['#667eea', '#764ba2', '#f093fb']}
+                        style={styles.enhancedAvatar}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                      >
+                        <Text style={styles.enhancedAvatarText}>
+                          {user?.email?.charAt(0).toUpperCase() || 'U'}
+                        </Text>
+                      </LinearGradient>
+                      <View style={styles.statusIndicator} />
+                    </View>
+                  </View>
+                  
+                  <View style={styles.profileInfoSection}>
+                    <Text style={styles.enhancedProfileName} numberOfLines={1}>
+                      {user?.user_metadata?.full_name || t('user')}
+                    </Text>
+                    <View style={styles.levelBadge}>
+                      <LinearGradient
+                        colors={['#FFD700', '#FFA500']}
+                        style={styles.levelBadgeGradient}
+                      >
+                        <Ionicons name="star" size={wp(3)} color="white" />
+                        <Text style={styles.levelBadgeText}>
+                          {dreamStats.total < 5 ? 'Yeni' : dreamStats.total < 20 ? 'Deneyimli' : 'Usta'}
+                        </Text>
+                      </LinearGradient>
+                    </View>
+                    <View style={styles.joinInfo}>
+                      <Ionicons name="calendar-outline" size={wp(3)} color="rgba(255,255,255,0.6)" />
+                      <Text style={styles.joinInfoText}>
+                        {new Date(user?.created_at).toLocaleDateString(currentLanguage === 'tr' ? 'tr-TR' : 'en-US')}
+                      </Text>
+                    </View>
+                  </View>
+                  
+                  <TouchableOpacity style={styles.enhancedEditButton} onPress={handleEditProfile}>
+                    <LinearGradient
+                      colors={['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.1)']}
+                      style={styles.editButtonGradient}
+                    >
+                      <Ionicons name="create-outline" size={wp(4)} color="white" />
+                    </LinearGradient>
                   </TouchableOpacity>
-                ))}
-              </View>
-            )}
+                </View>
+              </LinearGradient>
+            </View>
 
-            {/* Account Settings Section */}
-            <View style={styles.profileSection}>
-              <Text style={styles.profileSectionTitle}>⚙️ {t('accountSettings')}</Text>
+            {/* Enhanced Stats Grid */}
+            <View style={styles.enhancedStatsContainer}>
+              <View style={styles.enhancedStatsGrid}>
+                <View style={styles.enhancedStatCard}>
+                  <LinearGradient
+                    colors={['#667eea', '#764ba2']}
+                    style={styles.enhancedStatGradient}
+                  >
+                    <View style={styles.enhancedStatIcon}>
+                      <Ionicons name="moon" size={wp(5)} color="white" />
+                    </View>
+                    <View style={styles.enhancedStatContent}>
+                      <Text style={styles.enhancedStatNumber}>{dreamStats.total}</Text>
+                      <Text style={styles.enhancedStatLabel}>Toplam{"\n"}Rüya</Text>
+                    </View>
+                  </LinearGradient>
+                </View>
+                
+                <View style={styles.enhancedStatCard}>
+                  <LinearGradient
+                    colors={['#f093fb', '#f5576c']}
+                    style={styles.enhancedStatGradient}
+                  >
+                    <View style={styles.enhancedStatIcon}>
+                      <Ionicons name="grid" size={wp(5)} color="white" />
+                    </View>
+                    <View style={styles.enhancedStatContent}>
+                      <Text style={styles.enhancedStatNumber}>{Object.keys(dreamStats.categories).length}</Text>
+                      <Text style={styles.enhancedStatLabel}>Kategori</Text>
+                    </View>
+                  </LinearGradient>
+                </View>
+                
+                <View style={styles.enhancedStatCard}>
+                  <LinearGradient
+                    colors={['#4facfe', '#00f2fe']}
+                    style={styles.enhancedStatGradient}
+                  >
+                    <View style={styles.enhancedStatIcon}>
+                      <Ionicons name="trending-up" size={wp(5)} color="white" />
+                    </View>
+                    <View style={styles.enhancedStatContent}>
+                      <Text style={styles.enhancedStatNumber}>{dreamStats.thisWeek}</Text>
+                      <Text style={styles.enhancedStatLabel}>Bu Hafta</Text>
+                    </View>
+                  </LinearGradient>
+                </View>
+              </View>
+            </View>
+
+            {/* Language Selection Card */}
+            <View style={styles.modernMenuCard}>
+              <TouchableOpacity 
+                style={styles.modernLanguageButton} 
+                onPress={() => setShowLanguageOptions(!showLanguageOptions)}
+              >
+                <View style={styles.modernMenuItemLeft}>
+                  <View style={styles.modernMenuIcon}>
+                    <Ionicons name="language" size={20} color="white" />
+                  </View>
+                  <Text style={styles.modernMenuText}>{t('language')}</Text>
+                </View>
+                <Ionicons 
+                  name={showLanguageOptions ? 'chevron-up' : 'chevron-down'} 
+                  size={20} 
+                  color="rgba(255,255,255,0.7)" 
+                />
+              </TouchableOpacity>
+
+              {showLanguageOptions && (
+                <View style={styles.modernLanguageOptions}>
+                  {[
+                    { code: 'tr', name: 'Türkçe', flag: '🇹🇷' },
+                    { code: 'id', name: 'Bahasa Indonesia', flag: '🇮🇩' },
+                    { code: 'ja', name: '日本語', flag: '🇯🇵' },
+                    { code: 'th', name: 'ไทย', flag: '🇹🇭' },
+                    { code: 'ms', name: 'Bahasa Melayu', flag: '🇲🇾' }
+                  ].map((language) => (
+                    <TouchableOpacity
+                      key={language.code}
+                      style={[
+                        styles.modernLanguageOption,
+                        currentLanguage === language.code && styles.modernLanguageOptionActive
+                      ]}
+                      onPress={async () => {
+                         await changeLanguage(language.code);
+                         setShowLanguageOptions(false);
+                       }}
+                    >
+                      <Text style={styles.modernLanguageFlag}>{language.flag}</Text>
+                      <Text style={[
+                        styles.modernLanguageOptionText,
+                        currentLanguage === language.code && styles.modernLanguageOptionTextActive
+                      ]}>{language.name}</Text>
+                      {currentLanguage === language.code && (
+                        <Ionicons name="checkmark" size={16} color="#4CAF50" />
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+
+            {/* Account Settings Card */}
+            <View style={styles.modernMenuCard}>
+              <View style={styles.modernSectionHeader}>
+                <Ionicons name="settings-outline" size={18} color="white" />
+                <Text style={styles.modernSectionTitle}>{t('accountSettings')}</Text>
+              </View>
               
-              <TouchableOpacity style={styles.profileMenuItem} onPress={handleEditProfile}>
-                <Text style={styles.profileMenuIcon}>👤</Text>
-                <Text style={styles.profileMenuText}>{t('editProfile')}</Text>
-                <Text style={styles.profileMenuArrow}>›</Text>
+              <TouchableOpacity style={styles.modernMenuItem} onPress={handleEditProfile}>
+                <View style={styles.modernMenuItemLeft}>
+                  <View style={styles.modernMenuIcon}>
+                    <Ionicons name="person-outline" size={20} color="white" />
+                  </View>
+                  <Text style={styles.modernMenuText}>{t('editProfile')}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.5)" />
               </TouchableOpacity>
               
-              <TouchableOpacity style={styles.profileMenuItem} onPress={handleChangePassword}>
-                <Text style={styles.profileMenuIcon}>🔒</Text>
-                <Text style={styles.profileMenuText}>{t('changePassword')}</Text>
-                <Text style={styles.profileMenuArrow}>›</Text>
+              <TouchableOpacity style={styles.modernMenuItem} onPress={handleChangePassword}>
+                <View style={styles.modernMenuItemLeft}>
+                  <View style={styles.modernMenuIcon}>
+                    <Ionicons name="lock-closed-outline" size={20} color="white" />
+                  </View>
+                  <Text style={styles.modernMenuText}>{t('changePassword')}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.5)" />
               </TouchableOpacity>
             </View>
 
-            {/* Notification Settings Section */}
-            <View style={styles.profileSection}>
-              <Text style={styles.profileSectionTitle}>🔔 {t('notificationSettings')}</Text>
+            {/* Notification Settings Card */}
+            <View style={styles.modernMenuCard}>
+              <View style={styles.modernSectionHeader}>
+                <Ionicons name="notifications-outline" size={18} color="white" />
+                <Text style={styles.modernSectionTitle}>{t('notificationSettings')}</Text>
+              </View>
               
-              <TouchableOpacity style={styles.profileMenuItem} onPress={handlePushNotifications}>
-                <Text style={styles.profileMenuIcon}>📱</Text>
-                <Text style={styles.profileMenuText}>{t('pushNotifications')}</Text>
-                <Text style={styles.profileMenuArrow}>›</Text>
+              <TouchableOpacity style={styles.modernMenuItem} onPress={handlePushNotifications}>
+                <View style={styles.modernMenuItemLeft}>
+                  <View style={styles.modernMenuIcon}>
+                    <Ionicons name="phone-portrait-outline" size={20} color="white" />
+                  </View>
+                  <Text style={styles.modernMenuText}>{t('pushNotifications')}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.5)" />
               </TouchableOpacity>
               
-              <View style={styles.profileMenuItem}>
-                <Text style={styles.profileMenuIcon}>📧</Text>
-                <View style={styles.profileMenuTextContainer}>
-                  <Text style={styles.profileMenuText}>{t('emailNotifications')}</Text>
+              <View style={styles.modernMenuItem}>
+                <View style={styles.modernMenuItemLeft}>
+                  <View style={styles.modernMenuIcon}>
+                    <Ionicons name="mail-outline" size={20} color="white" />
+                  </View>
+                  <Text style={styles.modernMenuText}>{t('emailNotifications')}</Text>
                 </View>
                 <Switch
                   value={emailNotificationsEnabled}
                   onValueChange={handleEmailNotifications}
-                  trackColor={{ false: '#767577', true: '#4CAF50' }}
-                  thumbColor={emailNotificationsEnabled ? '#ffffff' : '#f4f3f4'}
-                  ios_backgroundColor="#3e3e3e"
+                  trackColor={{ false: 'rgba(255,255,255,0.2)', true: 'rgba(76, 175, 80, 0.5)' }}
+                  thumbColor={emailNotificationsEnabled ? '#4CAF50' : 'rgba(255,255,255,0.8)'}
+                  ios_backgroundColor="rgba(255,255,255,0.2)"
                 />
               </View>
-              
-
             </View>
 
-            {/* Privacy & Data Section */}
-            <View style={styles.profileSection}>
-              <Text style={styles.profileSectionTitle}>🛡️ {t('privacySettings')}</Text>
+            {/* Privacy & Data Card */}
+            <View style={styles.modernMenuCard}>
+              <View style={styles.modernSectionHeader}>
+                <Ionicons name="shield-checkmark-outline" size={18} color="white" />
+                <Text style={styles.modernSectionTitle}>{t('privacySettings')}</Text>
+              </View>
               
-              <TouchableOpacity style={styles.profileMenuItem} onPress={handleDataRequest}>
-                <Text style={styles.profileMenuIcon}>📧</Text>
-                <Text style={styles.profileMenuText}>{t('dataRequest')}</Text>
-                <Text style={styles.profileMenuArrow}>›</Text>
+              <TouchableOpacity style={styles.modernMenuItem} onPress={handleDataRequest}>
+                <View style={styles.modernMenuItemLeft}>
+                  <View style={styles.modernMenuIcon}>
+                    <Ionicons name="document-text-outline" size={20} color="white" />
+                  </View>
+                  <Text style={styles.modernMenuText}>{t('dataRequest')}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.5)" />
               </TouchableOpacity>
               
-              <TouchableOpacity style={styles.profileMenuItem} onPress={handleBackup}>
-                <Text style={styles.profileMenuIcon}>💾</Text>
-                <Text style={styles.profileMenuText}>{t('backup')}</Text>
-                <Text style={styles.profileMenuArrow}>›</Text>
+              <TouchableOpacity style={styles.modernMenuItem} onPress={handleBackup}>
+                <View style={styles.modernMenuItemLeft}>
+                  <View style={styles.modernMenuIcon}>
+                    <Ionicons name="cloud-upload-outline" size={20} color="white" />
+                  </View>
+                  <Text style={styles.modernMenuText}>{t('backup')}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.5)" />
               </TouchableOpacity>
               
-              <TouchableOpacity style={styles.profileMenuItem} onPress={handleViewBackups}>
-                <Text style={styles.profileMenuIcon}>📋</Text>
-                <Text style={styles.profileMenuText}>{t('backupHistory')}</Text>
-                <Text style={styles.profileMenuArrow}>›</Text>
+              <TouchableOpacity style={styles.modernMenuItem} onPress={handleViewBackups}>
+                <View style={styles.modernMenuItemLeft}>
+                  <View style={styles.modernMenuIcon}>
+                    <Ionicons name="time-outline" size={20} color="white" />
+                  </View>
+                  <Text style={styles.modernMenuText}>{t('backupHistory')}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.5)" />
               </TouchableOpacity>
             </View>
 
-            {/* App Settings Section */}
-            <View style={styles.profileSection}>
-              <Text style={styles.profileSectionTitle}>🎨 {t('theme')}</Text>
+            {/* App Settings Card */}
+            <View style={styles.modernMenuCard}>
+              <View style={styles.modernSectionHeader}>
+                <Ionicons name="color-palette-outline" size={18} color="white" />
+                <Text style={styles.modernSectionTitle}>{t('theme')}</Text>
+              </View>
               
-              <View style={styles.profileMenuItem}>
-                <Text style={styles.profileMenuIcon}>🌙</Text>
-                <Text style={styles.profileMenuText}>{t('darkMode')}</Text>
+              <View style={styles.modernMenuItem}>
+                <View style={styles.modernMenuItemLeft}>
+                  <View style={styles.modernMenuIcon}>
+                    <Ionicons name="moon-outline" size={20} color="white" />
+                  </View>
+                  <Text style={styles.modernMenuText}>{t('darkMode')}</Text>
+                </View>
                 <Switch
                   value={darkModeEnabled}
                   onValueChange={handleDarkMode}
@@ -1155,60 +1324,103 @@ Bu talep DreamPack uygulaması üzerinden gönderilmiştir.`;
               </View>
             </View>
 
-            {/* Help & Support Section */}
-            <View style={styles.profileSection}>
-              <Text style={styles.profileSectionTitle}>❓ {t('helpSupport')}</Text>
+            {/* Help & Support Card */}
+            <View style={styles.modernMenuCard}>
+              <View style={styles.modernSectionHeader}>
+                <Ionicons name="help-circle-outline" size={18} color="white" />
+                <Text style={styles.modernSectionTitle}>{t('helpSupport')}</Text>
+              </View>
               
-              <TouchableOpacity style={styles.profileMenuItem} onPress={handleContactUs}>
-                <Text style={styles.profileMenuIcon}>📞</Text>
-                <Text style={styles.profileMenuText}>{t('contactUs')}</Text>
-                <Text style={styles.profileMenuArrow}>›</Text>
+              <TouchableOpacity style={styles.modernMenuItem} onPress={handleContactUs}>
+                <View style={styles.modernMenuItemLeft}>
+                  <View style={styles.modernMenuIcon}>
+                    <Ionicons name="call-outline" size={20} color="white" />
+                  </View>
+                  <Text style={styles.modernMenuText}>{t('contactUs')}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.5)" />
               </TouchableOpacity>
               
-              <TouchableOpacity style={styles.profileMenuItem} onPress={handleFAQ}>
-                <Text style={styles.profileMenuIcon}>❓</Text>
-                <Text style={styles.profileMenuText}>{t('faq')}</Text>
-                <Text style={styles.profileMenuArrow}>›</Text>
+              <TouchableOpacity style={styles.modernMenuItem} onPress={handleFAQ}>
+                <View style={styles.modernMenuItemLeft}>
+                  <View style={styles.modernMenuIcon}>
+                    <Ionicons name="chatbubble-ellipses-outline" size={20} color="white" />
+                  </View>
+                  <Text style={styles.modernMenuText}>{t('faq')}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.5)" />
               </TouchableOpacity>
               
-              <TouchableOpacity style={styles.profileMenuItem} onPress={handleRateApp}>
-                <Text style={styles.profileMenuIcon}>⭐</Text>
-                <Text style={styles.profileMenuText}>{t('rateApp')}</Text>
-                <Text style={styles.profileMenuArrow}>›</Text>
+              <TouchableOpacity style={styles.modernMenuItem} onPress={handleRateApp}>
+                <View style={styles.modernMenuItemLeft}>
+                  <View style={styles.modernMenuIcon}>
+                    <Ionicons name="star-outline" size={20} color="white" />
+                  </View>
+                  <Text style={styles.modernMenuText}>{t('rateApp')}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.5)" />
               </TouchableOpacity>
               
-              <TouchableOpacity style={styles.profileMenuItem} onPress={handleShareApp}>
-                <Text style={styles.profileMenuIcon}>📤</Text>
-                <Text style={styles.profileMenuText}>{t('shareApp')}</Text>
-                <Text style={styles.profileMenuArrow}>›</Text>
+              <TouchableOpacity style={styles.modernMenuItem} onPress={handleShareApp}>
+                <View style={styles.modernMenuItemLeft}>
+                  <View style={styles.modernMenuIcon}>
+                    <Ionicons name="share-outline" size={20} color="white" />
+                  </View>
+                  <Text style={styles.modernMenuText}>{t('shareApp')}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.5)" />
               </TouchableOpacity>
             </View>
 
-            {/* App Info Section */}
-            <View style={styles.profileSection}>
-              <Text style={styles.profileSectionTitle}>ℹ️ {t('appInfo')}</Text>
+            {/* App Info Card */}
+            <View style={styles.modernMenuCard}>
+              <View style={styles.modernSectionHeader}>
+                <Ionicons name="information-circle-outline" size={18} color="white" />
+                <Text style={styles.modernSectionTitle}>{t('appInfo')}</Text>
+              </View>
               
-              <TouchableOpacity style={styles.profileMenuItem}>
-                <Text style={styles.profileMenuIcon}>📄</Text>
-                <Text style={styles.profileMenuText}>{t('termsOfService')}</Text>
-                <Text style={styles.profileMenuArrow}>›</Text>
+              <TouchableOpacity style={styles.modernMenuItem} onPress={handleTermsOfService}>
+                <View style={styles.modernMenuItemLeft}>
+                  <View style={styles.modernMenuIcon}>
+                    <Ionicons name="document-text-outline" size={20} color="white" />
+                  </View>
+                  <Text style={styles.modernMenuText}>{t('termsOfService')}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.5)" />
               </TouchableOpacity>
               
-              <TouchableOpacity style={styles.profileMenuItem}>
-                <Text style={styles.profileMenuIcon}>🔒</Text>
-                <Text style={styles.profileMenuText}>{t('privacyPolicy')}</Text>
-                <Text style={styles.profileMenuArrow}>›</Text>
+              <TouchableOpacity style={styles.modernMenuItem} onPress={handlePrivacyPolicy}>
+                <View style={styles.modernMenuItemLeft}>
+                  <View style={styles.modernMenuIcon}>
+                    <Ionicons name="shield-checkmark-outline" size={20} color="white" />
+                  </View>
+                  <Text style={styles.modernMenuText}>{t('privacyPolicy')}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.5)" />
               </TouchableOpacity>
               
-              <View style={styles.profileMenuItem}>
-                <Text style={styles.profileMenuIcon}>📱</Text>
-                <Text style={styles.profileMenuText}>{t('version')}</Text>
-                <Text style={styles.profileVersionText}>1.0.0</Text>
+              <View style={styles.modernMenuItem}>
+                <View style={styles.modernMenuItemLeft}>
+                  <View style={styles.modernMenuIcon}>
+                    <Ionicons name="phone-portrait-outline" size={20} color="white" />
+                  </View>
+                  <Text style={styles.modernMenuText}>{t('version')}</Text>
+                </View>
+                <Text style={styles.modernVersionText}>1.0.0</Text>
               </View>
             </View>
 
-            <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-              <Text style={styles.logoutButtonText}>🚪 {t('logout')}</Text>
+            {/* Modern Logout Button */}
+            <TouchableOpacity style={styles.modernLogoutButton} onPress={handleLogout}>
+              <LinearGradient
+                colors={['#ff4757', '#ff3838']}
+                style={styles.modernLogoutGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
+                <Ionicons name="log-out-outline" size={20} color="white" />
+                <Text style={styles.modernLogoutText}>{t('logout')}</Text>
+              </LinearGradient>
             </TouchableOpacity>
           </View>
         </BlurView>
@@ -1266,42 +1478,83 @@ Bu talep DreamPack uygulaması üzerinden gönderilmiştir.`;
         {activeTab === 'stats' && renderStatsTab()}
         {activeTab === 'profile' && renderProfileTab()}
 
-        {/* Bottom Navigation */}
-        <Animated.View style={[styles.bottomNav, { opacity: fadeAnim }]}>
-          <BlurView intensity={20} style={styles.bottomNavBlur}>
-            <View style={styles.bottomNavContent}>
-              <TouchableOpacity 
-                style={[styles.navItem, activeTab === 'home' && styles.navItemActive]}
-                onPress={() => setActiveTab('home')}
-              >
-                <Text style={[styles.navIcon, activeTab === 'home' && styles.navIconActive]}>🏠</Text>
-                <Text style={[styles.navLabel, activeTab === 'home' && styles.navLabelActive]}>{t('home')}</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.navItem, activeTab === 'dreams' && styles.navItemActive]}
-                onPress={() => setActiveTab('dreams')}
-              >
-                <Text style={[styles.navIcon, activeTab === 'dreams' && styles.navIconActive]}>📚</Text>
-                <Text style={[styles.navLabel, activeTab === 'dreams' && styles.navLabelActive]}>{t('myDreams')}</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.navItem, activeTab === 'stats' && styles.navItemActive]}
-                onPress={() => setActiveTab('stats')}
-              >
-                <Text style={[styles.navIcon, activeTab === 'stats' && styles.navIconActive]}>📊</Text>
-                <Text style={[styles.navLabel, activeTab === 'stats' && styles.navLabelActive]}>{t('statistics')}</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.navItem, activeTab === 'profile' && styles.navItemActive]}
-                onPress={() => setActiveTab('profile')}
-              >
-                <Text style={[styles.navIcon, activeTab === 'profile' && styles.navIconActive]}>👤</Text>
-                <Text style={[styles.navLabel, activeTab === 'profile' && styles.navLabelActive]}>{t('profile')}</Text>
-              </TouchableOpacity>
-            </View>
+        {/* Modern Floating Tab Bar */}
+        <Animated.View style={[styles.floatingTabBar, { opacity: fadeAnim }]}>
+          <BlurView intensity={40} style={styles.tabBarBlur}>
+            <LinearGradient
+              colors={['rgba(255,255,255,0.15)', 'rgba(255,255,255,0.05)']}
+              style={styles.tabBarGradient}
+            >
+              <View style={styles.tabBarContainer}>
+                <TouchableOpacity 
+                  style={[styles.modernTabItem, activeTab === 'home' && styles.modernTabItemActive]}
+                  onPress={() => setActiveTab('home')}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.tabIconContainer, activeTab === 'home' && styles.tabIconContainerActive]}>
+                    <Ionicons 
+                      name={activeTab === 'home' ? 'home' : 'home-outline'} 
+                      size={wp(6)} 
+                      color={activeTab === 'home' ? '#667eea' : 'rgba(255,255,255,0.7)'} 
+                    />
+                  </View>
+                  {activeTab === 'home' && (
+                    <Text style={styles.modernTabLabel}>{t('home')}</Text>
+                  )}
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.modernTabItem, activeTab === 'dreams' && styles.modernTabItemActive]}
+                  onPress={() => setActiveTab('dreams')}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.tabIconContainer, activeTab === 'dreams' && styles.tabIconContainerActive]}>
+                    <Ionicons 
+                      name={activeTab === 'dreams' ? 'library' : 'library-outline'} 
+                      size={wp(6)} 
+                      color={activeTab === 'dreams' ? '#f093fb' : 'rgba(255,255,255,0.7)'} 
+                    />
+                  </View>
+                  {activeTab === 'dreams' && (
+                    <Text style={styles.modernTabLabel}>{t('myDreams')}</Text>
+                  )}
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.modernTabItem, activeTab === 'stats' && styles.modernTabItemActive]}
+                  onPress={() => setActiveTab('stats')}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.tabIconContainer, activeTab === 'stats' && styles.tabIconContainerActive]}>
+                    <Ionicons 
+                      name={activeTab === 'stats' ? 'stats-chart' : 'stats-chart-outline'} 
+                      size={wp(6)} 
+                      color={activeTab === 'stats' ? '#4facfe' : 'rgba(255,255,255,0.7)'} 
+                    />
+                  </View>
+                  {activeTab === 'stats' && (
+                    <Text style={styles.modernTabLabel}>{t('statistics')}</Text>
+                  )}
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.modernTabItem, activeTab === 'profile' && styles.modernTabItemActive]}
+                  onPress={() => setActiveTab('profile')}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.tabIconContainer, activeTab === 'profile' && styles.tabIconContainerActive]}>
+                    <Ionicons 
+                      name={activeTab === 'profile' ? 'person' : 'person-outline'} 
+                      size={wp(6)} 
+                      color={activeTab === 'profile' ? '#FFD700' : 'rgba(255,255,255,0.7)'} 
+                    />
+                  </View>
+                  {activeTab === 'profile' && (
+                    <Text style={styles.modernTabLabel}>{t('profile')}</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </LinearGradient>
           </BlurView>
         </Animated.View>
       </KeyboardAvoidingView>
@@ -1393,12 +1646,12 @@ Bu talep DreamPack uygulaması üzerinden gönderilmiştir.`;
             >
               <Text style={styles.dreamDetailBackText}>← Geri</Text>
             </TouchableOpacity>
-            <Text style={styles.dreamDetailTitle}>🌙 Rüya Detayı</Text>
+            <Text style={styles.dreamDetailTitle}><Ionicons name="moon" size={18} color="white" /> Rüya Detayı</Text>
             <TouchableOpacity 
               style={styles.dreamDetailDeleteButton}
               onPress={() => handleDeleteDream(selectedDream.id)}
             >
-              <Text style={styles.dreamDetailDeleteText}>🗑️</Text>
+              <View style={styles.dreamDetailDeleteText}><Ionicons name="trash" size={18} color="#ff4444" /></View>
             </TouchableOpacity>
           </View>
           
@@ -1406,7 +1659,7 @@ Bu talep DreamPack uygulaması üzerinden gönderilmiştir.`;
             {/* Dream Date and Category */}
             <View style={styles.dreamDetailMeta}>
               <Text style={styles.dreamDetailDate}>
-                📅 {new Date(selectedDream.created_at).toLocaleDateString('tr-TR', {
+                <Ionicons name="calendar" size={14} color="rgba(255,255,255,0.7)" /> {new Date(selectedDream.created_at).toLocaleDateString('tr-TR', {
                   year: 'numeric',
                   month: 'long',
                   day: 'numeric',
@@ -1472,7 +1725,7 @@ Bu talep DreamPack uygulaması üzerinden gönderilmiştir.`;
                     return (
                       <>
                         <View style={[styles.dreamDetailInterpreterIcon, { backgroundColor: '#999' }]}>
-                          <Text style={styles.dreamDetailInterpreterEmoji}>❓</Text>
+                          <View style={styles.dreamDetailInterpreterEmoji}><Ionicons name="help-circle" size={24} color="white" /></View>
                         </View>
                         <View style={styles.dreamDetailInterpreterInfo}>
                           <Text style={styles.dreamDetailInterpreterName}>Henüz yorumlanmadı</Text>
@@ -1612,13 +1865,13 @@ Bu talep DreamPack uygulaması üzerinden gönderilmiştir.`;
 
           <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
             <View style={styles.passwordFormContainer}>
-              <Text style={styles.passwordFormTitle}>🔒 {t('changePasswordTitle') || 'Yeni Şifrenizi Belirleyin'}</Text>
+              <Text style={styles.passwordFormTitle}><Ionicons name="lock-closed" size={18} color="white" /> {t('changePasswordTitle') || 'Yeni Şifrenizi Belirleyin'}</Text>
               <Text style={styles.passwordFormSubtitle}>
                 {t('changePasswordSubtitle') || 'Güvenliğiniz için güçlü bir şifre seçin.'}
               </Text>
 
               <View style={styles.profileFormSection}>
-                <Text style={styles.profileFormLabel}>🔑 {t('newPassword') || 'Yeni Şifre'}</Text>
+                <Text style={styles.profileFormLabel}><Ionicons name="key" size={14} color="white" /> {t('newPassword') || 'Yeni Şifre'}</Text>
                 <TextInput
                   style={styles.profileFormInput}
                   value={passwordData.newPassword}
@@ -1644,7 +1897,7 @@ Bu talep DreamPack uygulaması üzerinden gönderilmiştir.`;
               </View>
 
               <View style={styles.passwordRequirements}>
-                <Text style={styles.passwordRequirementsTitle}>📋 {t('passwordRequirements') || 'Şifre Gereksinimleri:'}</Text>
+                <Text style={styles.passwordRequirementsTitle}><Ionicons name="list" size={14} color="white" /> {t('passwordRequirements') || 'Şifre Gereksinimleri:'}</Text>
                 <Text style={styles.passwordRequirementItem}>• {t('minLength') || 'En az 6 karakter'}</Text>
                 <Text style={styles.passwordRequirementItem}>• {t('matchPasswords') || 'Şifreler eşleşmeli'}</Text>
                 <Text style={styles.passwordRequirementItem}>• {t('strongPassword') || 'Güçlü şifre önerilir'}</Text>
@@ -1652,7 +1905,7 @@ Bu talep DreamPack uygulaması üzerinden gönderilmiştir.`;
 
               <View style={styles.profileFormSection}>
                 <Text style={styles.profileFormNote}>
-                  🛡️ {t('passwordNote') || 'Şifreniz güvenli bir şekilde şifrelenerek saklanacaktır.'}
+                  <Ionicons name="shield-checkmark" size={14} color="white" /> {t('passwordNote') || 'Şifreniz güvenli bir şekilde şifrelenerek saklanacaktır.'}
                 </Text>
               </View>
             </View>
@@ -1688,13 +1941,13 @@ Bu talep DreamPack uygulaması üzerinden gönderilmiştir.`;
 
           <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
             <View style={styles.passwordFormContainer}>
-              <Text style={styles.passwordFormTitle}>📧 {t('dataRequestTitle') || 'Veri Talep Formu'}</Text>
+              <Text style={styles.passwordFormTitle}><Ionicons name="mail" size={18} color="white" /> {t('dataRequestTitle') || 'Veri Talep Formu'}</Text>
               <Text style={styles.passwordFormSubtitle}>
                 {t('dataRequestSubtitle') || 'Verilerinizi talep etmek için aşağıdaki formu doldurun.'}
               </Text>
 
               <View style={styles.profileFormSection}>
-                <Text style={styles.profileFormLabel}>📋 {t('requestType') || 'Talep Türü'} *</Text>
+                <Text style={styles.profileFormLabel}><Ionicons name="list" size={14} color="white" /> {t('requestType') || 'Talep Türü'} *</Text>
                 <View style={styles.pickerContainer}>
                   <TouchableOpacity
                     style={styles.profileFormInput}
@@ -1720,7 +1973,7 @@ Bu talep DreamPack uygulaması üzerinden gönderilmiştir.`;
               </View>
 
               <View style={styles.profileFormSection}>
-                <Text style={styles.profileFormLabel}>❓ {t('reason') || 'Gerekçe'} *</Text>
+                <Text style={styles.profileFormLabel}><Ionicons name="help-circle" size={14} color="white" /> {t('reason') || 'Gerekçe'} *</Text>
                 <TextInput
                   style={[styles.profileFormInput, styles.textArea]}
                   value={dataRequestForm.reason}
@@ -1963,9 +2216,9 @@ const getStyles = (darkMode) => StyleSheet.create({
     flex: 1,
   },
   header: {
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingTop: Platform.OS === 'ios' ? (isLargeDevice() ? hp(8) : hp(7)) : hp(5),
+    paddingHorizontal: wp(5),
+    paddingBottom: hp(2.5),
   },
   headerContent: {
     flexDirection: 'row',
@@ -1973,12 +2226,12 @@ const getStyles = (darkMode) => StyleSheet.create({
     alignItems: 'center',
   },
   welcomeText: {
-    fontSize: 16,
+    fontSize: RFValue(16),
     color: darkMode ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.8)',
     fontWeight: '500',
   },
   userName: {
-    fontSize: 24,
+    fontSize: RFValue(24),
     color: darkMode ? 'white' : 'white',
     fontWeight: 'bold',
     textShadowColor: darkMode ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.3)',
@@ -1986,12 +2239,12 @@ const getStyles = (darkMode) => StyleSheet.create({
     textShadowRadius: 4,
   },
   profileButton: {
-    borderRadius: 25,
+    borderRadius: wp(6.5),
     overflow: 'hidden',
   },
   profileButtonGradient: {
-    width: 50,
-    height: 50,
+    width: wp(13),
+    height: wp(13),
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -2825,6 +3078,293 @@ const getStyles = (darkMode) => StyleSheet.create({
      color: 'rgba(255,255,255,0.6)',
      fontWeight: '400',
    },
+   // Profile Container
+   profileContainer: {
+     flex: 1,
+     backgroundColor: 'transparent',
+   },
+   // Modern Profile Styles
+   modernProfileHeader: {
+     flexDirection: 'row',
+     alignItems: 'center',
+     padding: wp(6),
+     backgroundColor: 'rgba(255,255,255,0.08)',
+     borderRadius: wp(5),
+     marginHorizontal: wp(5),
+     marginBottom: hp(2.5),
+     borderWidth: 1,
+     borderColor: 'rgba(255,255,255,0.15)',
+   },
+   modernAvatarContainer: {
+     position: 'relative',
+     marginRight: wp(5),
+   },
+   modernAvatar: {
+     width: wp(20),
+     height: wp(20),
+     borderRadius: wp(10),
+     justifyContent: 'center',
+     alignItems: 'center',
+     borderWidth: 3,
+     borderColor: 'rgba(255,255,255,0.3)',
+   },
+   modernAvatarText: {
+     fontSize: RFValue(28),
+     fontWeight: '700',
+     color: 'white',
+     textShadowColor: 'rgba(0,0,0,0.3)',
+     textShadowOffset: { width: 1, height: 1 },
+     textShadowRadius: 2,
+   },
+   onlineIndicator: {
+     position: 'absolute',
+     bottom: wp(1.5),
+     right: wp(1.5),
+     width: wp(4),
+     height: wp(4),
+     borderRadius: wp(2),
+     backgroundColor: '#4CAF50',
+     borderWidth: 2,
+     borderColor: 'white',
+   },
+   modernProfileInfo: {
+     flex: 1,
+     justifyContent: 'center',
+   },
+   joinDateContainer: {
+     flexDirection: 'row',
+     alignItems: 'center',
+     marginTop: 4,
+   },
+   modernJoinDate: {
+     fontSize: RFValue(13),
+     color: 'rgba(255,255,255,0.7)',
+     marginLeft: wp(1.5),
+     fontWeight: '500',
+   },
+   editProfileButton: {
+     width: wp(10),
+     height: wp(10),
+     borderRadius: wp(5),
+     backgroundColor: 'rgba(255,255,255,0.15)',
+     justifyContent: 'center',
+     alignItems: 'center',
+     borderWidth: 1,
+     borderColor: 'rgba(255,255,255,0.2)',
+   },
+   userLevelContainer: {
+     flexDirection: 'row',
+     alignItems: 'center',
+     marginBottom: 4,
+   },
+   userLevelText: {
+     fontSize: RFValue(14),
+     color: 'rgba(255,255,255,0.9)',
+     marginLeft: wp(1.5),
+     fontWeight: '600',
+   },
+   modernProfileAvatar: {
+     width: 100,
+     height: 100,
+     borderRadius: 50,
+     backgroundColor: 'rgba(255,255,255,0.1)',
+     justifyContent: 'center',
+     alignItems: 'center',
+     marginBottom: 15,
+     borderWidth: 3,
+     borderColor: 'rgba(255,255,255,0.2)',
+   },
+   modernProfileName: {
+     fontSize: RFValue(20),
+     fontWeight: '700',
+     color: 'white',
+     marginBottom: hp(0.5),
+     textShadowColor: 'rgba(0,0,0,0.2)',
+     textShadowOffset: { width: 1, height: 1 },
+     textShadowRadius: 2,
+   },
+   modernProfileEmail: {
+     fontSize: RFValue(15),
+     color: 'rgba(255,255,255,0.85)',
+     marginBottom: hp(0.3),
+     fontWeight: '500',
+   },
+   modernProfileJoinDate: {
+     fontSize: 14,
+     color: 'rgba(255,255,255,0.6)',
+     textAlign: 'center',
+   },
+   modernStatsGrid: {
+     flexDirection: 'row',
+     marginHorizontal: wp(5),
+     marginBottom: hp(3),
+     justifyContent: 'space-between',
+   },
+   modernStatCard: {
+     flex: 1,
+     marginHorizontal: wp(1),
+     borderRadius: wp(4),
+     overflow: 'hidden',
+     elevation: 3,
+     shadowColor: '#000',
+     shadowOffset: { width: 0, height: 2 },
+     shadowOpacity: 0.25,
+     shadowRadius: 3.84,
+   },
+   statCardGradient: {
+     padding: wp(4),
+     alignItems: 'center',
+     justifyContent: 'center',
+     minHeight: hp(12),
+   },
+   statIconContainer: {
+     width: wp(8),
+     height: wp(8),
+     borderRadius: wp(4),
+     backgroundColor: 'rgba(255,255,255,0.2)',
+     justifyContent: 'center',
+     alignItems: 'center',
+     marginBottom: hp(1),
+   },
+   modernStatItem: {
+     flex: 1,
+     alignItems: 'center',
+   },
+   modernStatNumber: {
+     fontSize: RFValue(24),
+     fontWeight: '800',
+     color: 'white',
+     marginBottom: hp(0.5),
+     textShadowColor: 'rgba(0,0,0,0.3)',
+     textShadowOffset: { width: 1, height: 1 },
+     textShadowRadius: 2,
+   },
+   modernStatLabel: {
+     fontSize: RFValue(11),
+     color: 'rgba(255,255,255,0.9)',
+     fontWeight: '600',
+     textAlign: 'center',
+     textTransform: 'uppercase',
+     letterSpacing: 0.5,
+   },
+   modernStatDivider: {
+     width: 1,
+     backgroundColor: 'rgba(255,255,255,0.3)',
+     marginHorizontal: 15,
+   },
+   modernMenuCard: {
+     backgroundColor: 'rgba(255,255,255,0.1)',
+     borderRadius: 20,
+     marginHorizontal: 20,
+     marginBottom: 20,
+     borderWidth: 1,
+     borderColor: 'rgba(255,255,255,0.2)',
+     overflow: 'hidden',
+   },
+   modernSectionHeader: {
+     flexDirection: 'row',
+     alignItems: 'center',
+     padding: 20,
+     paddingBottom: 15,
+     backgroundColor: 'rgba(255,255,255,0.05)',
+   },
+   modernSectionTitle: {
+     fontSize: 16,
+     fontWeight: '600',
+     color: 'white',
+     marginLeft: 10,
+   },
+   modernMenuItem: {
+     flexDirection: 'row',
+     alignItems: 'center',
+     justifyContent: 'space-between',
+     paddingHorizontal: 20,
+     paddingVertical: 15,
+     borderBottomWidth: 1,
+     borderBottomColor: 'rgba(255,255,255,0.1)',
+   },
+   modernMenuItemLeft: {
+     flexDirection: 'row',
+     alignItems: 'center',
+     flex: 1,
+   },
+   modernMenuIcon: {
+     width: 35,
+     height: 35,
+     borderRadius: 17.5,
+     backgroundColor: 'rgba(255,255,255,0.1)',
+     justifyContent: 'center',
+     alignItems: 'center',
+     marginRight: 15,
+   },
+   modernMenuText: {
+     fontSize: 16,
+     color: 'white',
+     fontWeight: '500',
+     flex: 1,
+   },
+   modernLanguageButton: {
+     flexDirection: 'row',
+     alignItems: 'center',
+     justifyContent: 'space-between',
+     paddingHorizontal: 20,
+     paddingVertical: 15,
+   },
+   modernLanguageOptions: {
+     paddingHorizontal: 20,
+     paddingBottom: 10,
+   },
+   modernLanguageOption: {
+     flexDirection: 'row',
+     alignItems: 'center',
+     paddingVertical: 12,
+     paddingHorizontal: 15,
+     borderRadius: 12,
+     marginBottom: 8,
+     backgroundColor: 'rgba(255,255,255,0.05)',
+   },
+   modernLanguageOptionActive: {
+     backgroundColor: 'rgba(76, 175, 80, 0.2)',
+     borderWidth: 1,
+     borderColor: 'rgba(76, 175, 80, 0.5)',
+   },
+   modernLanguageFlag: {
+     fontSize: 20,
+     marginRight: 12,
+   },
+   modernLanguageOptionText: {
+     fontSize: 16,
+     color: 'rgba(255,255,255,0.8)',
+     fontWeight: '500',
+   },
+   modernLanguageOptionTextActive: {
+     color: 'white',
+     fontWeight: '600',
+   },
+   modernVersionText: {
+     fontSize: 14,
+     color: 'rgba(255,255,255,0.6)',
+     fontWeight: '500',
+   },
+   modernLogoutButton: {
+     marginHorizontal: 20,
+     marginBottom: 30,
+     borderRadius: 15,
+     overflow: 'hidden',
+   },
+   modernLogoutGradient: {
+     flexDirection: 'row',
+     alignItems: 'center',
+     justifyContent: 'center',
+     paddingVertical: 15,
+     paddingHorizontal: 20,
+   },
+   modernLogoutText: {
+     color: 'white',
+     fontSize: 16,
+     fontWeight: '600',
+     marginLeft: 10,
+   },
    // Password Modal Styles
    passwordFormContainer: {
      padding: 20,
@@ -3070,5 +3610,223 @@ const getStyles = (darkMode) => StyleSheet.create({
      fontSize: 14,
      lineHeight: 20,
      fontWeight: '400',
+   },
+   // Enhanced Profile Header Styles
+   enhancedProfileHeader: {
+     marginTop: hp(2),
+     marginBottom: hp(3),
+     marginHorizontal: wp(5),
+     borderRadius: wp(6),
+     overflow: 'hidden',
+     elevation: 8,
+     shadowColor: '#000',
+     shadowOffset: { width: 0, height: 4 },
+     shadowOpacity: 0.3,
+     shadowRadius: 8,
+   },
+   profileHeaderGradient: {
+     paddingVertical: hp(3),
+     paddingHorizontal: wp(5),
+   },
+   profileHeaderContent: {
+     flexDirection: 'row',
+     alignItems: 'center',
+     justifyContent: 'space-between',
+   },
+   avatarSection: {
+     alignItems: 'center',
+     marginRight: wp(4),
+   },
+   avatarWrapper: {
+     position: 'relative',
+   },
+   enhancedAvatar: {
+     width: wp(18),
+     height: wp(18),
+     borderRadius: wp(9),
+     backgroundColor: 'rgba(255,255,255,0.2)',
+     justifyContent: 'center',
+     alignItems: 'center',
+     borderWidth: 3,
+     borderColor: 'rgba(255,255,255,0.3)',
+   },
+   enhancedAvatarText: {
+     fontSize: wp(8),
+     fontWeight: 'bold',
+     color: 'white',
+   },
+   statusIndicator: {
+     position: 'absolute',
+     bottom: 2,
+     right: 2,
+     width: wp(4),
+     height: wp(4),
+     borderRadius: wp(2),
+     backgroundColor: '#4CAF50',
+     borderWidth: 2,
+     borderColor: 'white',
+   },
+   profileInfoSection: {
+     flex: 1,
+   },
+   enhancedProfileName: {
+     fontSize: wp(5.5),
+     fontWeight: 'bold',
+     color: 'white',
+     marginBottom: hp(0.5),
+   },
+   levelBadge: {
+     alignSelf: 'flex-start',
+     borderRadius: wp(3),
+     overflow: 'hidden',
+     marginBottom: hp(1),
+   },
+   levelBadgeGradient: {
+     paddingHorizontal: wp(3),
+     paddingVertical: hp(0.5),
+   },
+   levelBadgeText: {
+     color: 'white',
+     fontSize: wp(3),
+     fontWeight: '600',
+   },
+   joinInfo: {
+     flexDirection: 'row',
+     alignItems: 'center',
+   },
+   joinInfoText: {
+     color: 'rgba(255,255,255,0.8)',
+     fontSize: wp(3.2),
+     marginLeft: wp(1),
+   },
+   enhancedEditButton: {
+     borderRadius: wp(6),
+     overflow: 'hidden',
+   },
+   editButtonGradient: {
+     paddingHorizontal: wp(4),
+     paddingVertical: hp(1.2),
+     flexDirection: 'row',
+     alignItems: 'center',
+   },
+   // Enhanced Stats Styles
+   enhancedStatsContainer: {
+     marginHorizontal: wp(5),
+     marginBottom: hp(3),
+   },
+   enhancedStatsGrid: {
+     flexDirection: 'row',
+     justifyContent: 'space-between',
+   },
+   enhancedStatCard: {
+     flex: 1,
+     marginHorizontal: wp(1),
+     borderRadius: wp(4),
+     overflow: 'hidden',
+     elevation: 5,
+     shadowColor: '#000',
+     shadowOffset: { width: 0, height: 2 },
+     shadowOpacity: 0.25,
+     shadowRadius: 3.84,
+   },
+   enhancedStatGradient: {
+     padding: wp(4),
+     alignItems: 'center',
+     justifyContent: 'center',
+     minHeight: hp(12),
+   },
+   enhancedStatIcon: {
+     fontSize: wp(6),
+     marginBottom: hp(1),
+   },
+   enhancedStatContent: {
+     alignItems: 'center',
+   },
+   enhancedStatNumber: {
+     fontSize: wp(6),
+     fontWeight: 'bold',
+     color: 'white',
+     marginBottom: hp(0.5),
+     textShadowColor: 'rgba(0,0,0,0.3)',
+     textShadowOffset: { width: 1, height: 1 },
+     textShadowRadius: 2,
+   },
+   enhancedStatLabel: {
+     fontSize: wp(3),
+     color: 'rgba(255,255,255,0.9)',
+     fontWeight: '600',
+     textAlign: 'center',
+     lineHeight: wp(3.5),
+   },
+   // Modern Floating Tab Bar Styles
+   floatingTabBar: {
+     position: 'absolute',
+     bottom: hp(3),
+     left: wp(5),
+     right: wp(5),
+     height: hp(8),
+     borderRadius: wp(8),
+     overflow: 'hidden',
+     elevation: 10,
+     shadowColor: '#000',
+     shadowOffset: { width: 0, height: 5 },
+     shadowOpacity: 0.3,
+     shadowRadius: 10,
+     zIndex: 1000,
+   },
+   tabBarBlur: {
+     flex: 1,
+     borderRadius: wp(8),
+   },
+   tabBarGradient: {
+     flex: 1,
+     borderRadius: wp(8),
+     borderWidth: 1,
+     borderColor: 'rgba(255,255,255,0.2)',
+   },
+   tabBarContainer: {
+     flex: 1,
+     flexDirection: 'row',
+     alignItems: 'center',
+     justifyContent: 'space-around',
+     paddingHorizontal: wp(2),
+     paddingVertical: hp(1),
+   },
+   modernTabItem: {
+     flexDirection: 'row',
+     alignItems: 'center',
+     justifyContent: 'center',
+     paddingVertical: hp(0.8),
+     paddingHorizontal: wp(2),
+     borderRadius: wp(6),
+     minWidth: wp(12),
+     
+   },
+   modernTabItemActive: {
+     backgroundColor: 'rgba(255,255,255,0.15)',
+     paddingHorizontal: wp(3),
+     minWidth: wp(20),
+   },
+   tabIconContainer: {
+     width: wp(8),
+     height: wp(8),
+     borderRadius: wp(4),
+     justifyContent: 'center',
+     alignItems: 'center',
+     backgroundColor: 'rgba(255,255,255,0.1)',
+ 
+    },
+   tabIconContainerActive: {
+     backgroundColor: 'rgba(255,255,255,0.25)',
+     transform: [{ scale: 1.1 }],
+   },
+   modernTabLabel: {
+     color: 'white',
+     fontSize: wp(3.2),
+     fontWeight: '600',
+     marginLeft: wp(2),
+     textShadowColor: 'rgba(0,0,0,0.3)',
+     textShadowOffset: { width: 0, height: 1 },
+     textShadowRadius: 2,
    },
  });

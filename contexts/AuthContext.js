@@ -27,7 +27,11 @@ export const AuthProvider = ({ children }) => {
         console.log('Auth state changed:', event);
         setSession(session);
         setUser(session?.user ?? null);
-        setLoading(false);
+        
+        // Loading'i sadece başarılı giriş veya çıkış durumunda false yap
+        if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'INITIAL_SESSION') {
+          setLoading(false);
+        }
       }
     );
 
@@ -42,9 +46,9 @@ export const AuthProvider = ({ children }) => {
   };
 
   const signIn = async (email, password) => {
-    setLoading(true);
     const result = await authService.signIn(email, password);
-    setLoading(false);
+    // Loading state'i sadece başarılı giriş durumunda değiştir
+    // Başarısız giriş durumunda kullanıcı login ekranında kalmalı
     return result;
   };
 

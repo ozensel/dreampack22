@@ -17,6 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { wp, hp, RFValue, spacing, fontSize, borderRadius, iconSize, isSmallDevice, isLargeDevice } from '../utils/responsive';
 
 const { width, height } = Dimensions.get('window');
 
@@ -279,16 +280,16 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    paddingTop: Platform.OS === 'ios' ? 80 : 60,
-    paddingBottom: 20,
+    paddingTop: Platform.OS === 'ios' ? (isLargeDevice() ? hp(12) : hp(10)) : hp(8),
+    paddingBottom: hp(2.5),
   },
   logoContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: wp(20),
+    height: wp(20),
+    borderRadius: wp(10),
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: hp(2.5),
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
