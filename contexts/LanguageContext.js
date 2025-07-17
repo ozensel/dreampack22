@@ -26,13 +26,19 @@ export const LanguageProvider = ({ children }) => {
         changeLanguage(savedLanguage);
       } else {
         // Cihaz dilini algıla
-        const deviceLanguage = Localization.locale.split('-')[0]; // 'en-US' -> 'en'
-        
-        // Desteklenen diller arasında cihaz dili varsa onu kullan
-        if (LANGUAGES[deviceLanguage]) {
-          changeLanguage(deviceLanguage);
+        const deviceLocale = Localization.locale;
+        if (deviceLocale) {
+          const deviceLanguage = deviceLocale.split('-')[0]; // 'en-US' -> 'en'
+          
+          // Desteklenen diller arasında cihaz dili varsa onu kullan
+          if (LANGUAGES[deviceLanguage]) {
+            changeLanguage(deviceLanguage);
+          } else {
+            // Desteklenmiyorsa varsayılan dili kullan
+            changeLanguage(DEFAULT_LANGUAGE);
+          }
         } else {
-          // Desteklenmiyorsa varsayılan dili kullan
+          // Cihaz dili algılanamazsa varsayılan dili kullan
           changeLanguage(DEFAULT_LANGUAGE);
         }
       }

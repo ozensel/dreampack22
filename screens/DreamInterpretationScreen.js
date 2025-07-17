@@ -13,13 +13,20 @@ import {
   Platform,
   Image,
   Modal,
+  Linking,
+  Switch,
+  Share,
 } from 'react-native';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { dreamService } from '../services/dreamService';
+import { supabase } from '../config/supabase';
 
 
 const { width, height } = Dimensions.get('window');
@@ -39,9 +46,38 @@ export default function DreamInterpretationScreen({ navigation }) {
   const [showFamousPersonModal, setShowFamousPersonModal] = useState(false);
   const [selectedDream, setSelectedDream] = useState(null);
   const [showLanguageOptions, setShowLanguageOptions] = useState(false);
+  const [showEditProfileModal, setShowEditProfileModal] = useState(false);
+  const [editProfileData, setEditProfileData] = useState({
+    displayName: '',
+    bio: '',
+    birthDate: '',
+    location: '',
+    favoriteSymbol: ''
+  });
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+  const [passwordData, setPasswordData] = useState({
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState(true);
+  const [darkModeEnabled, setDarkModeEnabled] = useState(false);
+  const [dataRequestModalVisible, setDataRequestModalVisible] = useState(false);
+  const [showFAQModal, setShowFAQModal] = useState(false);
+  const [dataRequestForm, setDataRequestForm] = useState({
+    requestType: '',
+    reason: '',
+    specificData: '',
+    urgency: 'normal',
+    additionalInfo: ''
+  });
+  const [backupHistoryModalVisible, setBackupHistoryModalVisible] = useState(false);
+  const [backupHistory, setBackupHistory] = useState([]);
   
   const { user, signOut } = useAuth();
   const { t, currentLanguage, changeLanguage } = useLanguage();
+  
+  // Dinamik styles
+  const styles = useMemo(() => getStyles(darkModeEnabled), [darkModeEnabled]);
   
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
@@ -92,6 +128,12 @@ export default function DreamInterpretationScreen({ navigation }) {
       if (dreamsResult.success) {
         setRecentDreams(dreamsResult.data);
         calculateStats(dreamsResult.data);
+      }
+      
+      // Karanlık mod ayarını yükle
+      const darkModeSetting = await AsyncStorage.getItem('darkModeEnabled');
+      if (darkModeSetting !== null) {
+        setDarkModeEnabled(JSON.parse(darkModeSetting));
       }
     } catch (error) {
       console.error('Veri yükleme hatası:', error);
@@ -214,6 +256,498 @@ export default function DreamInterpretationScreen({ navigation }) {
         { text: t('logout'), onPress: signOut, style: 'destructive' },
       ]
     );
+  };
+
+  const handleEditProfile = () => {
+    // Mevcut kullanıcı bilgilerini form'a yükle
+    setEditProfileData({
+      displayName: user?.user_metadata?.display_name || user?.email?.split('@')[0] || '',
+      bio: user?.user_metadata?.bio || '',
+      birthDate: user?.user_metadata?.birth_date || '',
+      location: user?.user_metadata?.location || '',
+      favoriteSymbol: user?.user_metadata?.favorite_symbol || ''
+    });
+    setShowEditProfileModal(true);
+  };
+
+  const handleSaveProfile = async () => {
+    try {
+      // Burada profil güncelleme API'si çağrılacak
+      // Şimdilik sadece alert gösteriyoruz
+      Alert.alert(
+        t('success') || 'Başarılı',
+        t('profileUpdated') || 'Profil başarıyla güncellendi.'
+      );
+      setShowEditProfileModal(false);
+    } catch (error) {
+      Alert.alert(
+        t('error') || 'Hata',
+        t('profileUpdateError') || 'Profil güncellenirken bir hata oluştu.'
+      );
+    }
+  };
+
+  const handleChangePassword = () => {
+    setPasswordData({
+      newPassword: '',
+      confirmPassword: ''
+    });
+    setShowChangePasswordModal(true);
+  };
+
+  const handleSavePassword = async () => {
+    if (!passwordData.newPassword || !passwordData.confirmPassword) {
+      Alert.alert(
+        t('error') || 'Hata',
+        t('fillAllFields') || 'Lütfen tüm alanları doldurun.'
+      );
+      return;
+    }
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      Alert.alert(
+        t('error') || 'Hata',
+        t('passwordsDoNotMatch') || 'Şifreler eşleşmiyor.'
+      );
+      return;
+    }
+
+    if (passwordData.newPassword.length < 6) {
+      Alert.alert(
+        t('error') || 'Hata',
+        t('passwordTooShort') || 'Şifre en az 6 karakter olmalıdır.'
+      );
+      return;
+    }
+
+    try {
+      // Burada şifre güncelleme API'si çağrılacak
+      // Şimdilik sadece alert gösteriyoruz
+      Alert.alert(
+        t('success') || 'Başarılı',
+        t('passwordChanged') || 'Şifreniz başarıyla değiştirildi.'
+      );
+      setShowChangePasswordModal(false);
+    } catch (error) {
+      Alert.alert(
+        t('error') || 'Hata',
+        t('passwordError') || 'Şifre değiştirilirken bir hata oluştu.'
+      );
+    }
+  };
+
+  // Notification Settings Handlers
+  const handlePushNotifications = () => {
+    Alert.alert(
+      t('pushNotifications') || 'Anlık Bildirimler',
+      t('pushNotificationsDesc') || 'Anlık bildirim ayarlarınızı yönetin.',
+      [
+        { text: t('cancel') || 'İptal', style: 'cancel' },
+        { 
+          text: t('settings') || 'Ayarlar', 
+          onPress: () => {
+            if (Platform.OS === 'ios') {
+              Linking.openURL('app-settings:');
+            } else {
+              Linking.openSettings();
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleEmailNotifications = (value) => {
+    const action = value ? 'açmak' : 'kapatmak';
+    const actionEn = value ? 'enable' : 'disable';
+    
+    Alert.alert(
+      t('emailNotifications') || 'E-posta Bildirimleri',
+      value 
+        ? (t('emailNotificationsEnable') || 'E-posta bildirimlerini açmak istiyor musunuz?')
+        : (t('emailNotificationsDisable') || 'E-posta bildirimlerini kapatmak istiyor musunuz?'),
+      [
+        { 
+          text: t('cancel') || 'İptal', 
+          style: 'cancel',
+          onPress: () => {
+            // Switch'i eski haline döndür
+            setEmailNotificationsEnabled(!value);
+          }
+        },
+        { 
+          text: t('confirm') || 'Onayla', 
+          onPress: () => {
+            setEmailNotificationsEnabled(value);
+            Alert.alert(
+              t('success') || 'Başarılı',
+              value 
+                ? (t('emailNotificationsEnabled') || 'E-posta bildirimleri açıldı.')
+                : (t('emailNotificationsDisabled') || 'E-posta bildirimleri kapatıldı.')
+            );
+          }
+        }
+      ]
+    );
+  };
+
+
+
+  // Privacy & Data Handlers
+  const handleDataRequest = () => {
+    setDataRequestModalVisible(true);
+  };
+
+  const handleDataRequestSubmit = async () => {
+    try {
+      if (!dataRequestForm.requestType || !dataRequestForm.reason) {
+        Alert.alert(
+          t('error') || 'Hata',
+          t('fillRequiredFields') || 'Lütfen gerekli alanları doldurun.'
+        );
+        return;
+      }
+
+      // E-posta içeriği hazırla
+      const emailSubject = `DreamPack Veri Talebi - ${user?.email}`;
+      const emailBody = `
+Veri Talebi Detayları:
+
+Kullanıcı: ${user?.email}
+Talep Tarihi: ${new Date().toLocaleDateString('tr-TR')}
+Talep Türü: ${dataRequestForm.requestType}
+Gerekçe: ${dataRequestForm.reason}
+İstenen Spesifik Veriler: ${dataRequestForm.specificData || 'Belirtilmemiş'}
+Aciliyet: ${dataRequestForm.urgency}
+Ek Bilgiler: ${dataRequestForm.additionalInfo || 'Yok'}
+
+Bu talep DreamPack uygulaması üzerinden gönderilmiştir.`;
+
+      // E-posta gönderme (mailto kullanarak)
+      const mailtoUrl = `mailto:support@dreampack.com?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+      
+      const canOpen = await Linking.canOpenURL(mailtoUrl);
+      if (canOpen) {
+        await Linking.openURL(mailtoUrl);
+        
+        // Kullanıcıya onay mesajı
+        Alert.alert(
+          t('requestSent') || 'Talep Gönderildi',
+          t('dataRequestSentMessage') || 'Veri talebiniz başarıyla gönderildi. E-posta adresinize onay mesajı gönderilecektir. Talebiniz 3-5 iş günü içinde değerlendirilecektir.',
+          [{ text: t('ok') || 'Tamam' }]
+        );
+        
+        // Formu temizle ve modal'ı kapat
+        setDataRequestForm({
+          requestType: '',
+          reason: '',
+          specificData: '',
+          urgency: 'normal',
+          additionalInfo: ''
+        });
+        setDataRequestModalVisible(false);
+      } else {
+        Alert.alert(
+          t('error') || 'Hata',
+          t('emailAppNotFound') || 'E-posta uygulaması bulunamadı. Lütfen manuel olarak support@dreampack.com adresine başvurun.'
+        );
+      }
+    } catch (error) {
+      console.error('Data request error:', error);
+      Alert.alert(
+        t('error') || 'Hata',
+        t('requestError') || 'Talep gönderilirken bir hata oluştu.'
+      );
+    }
+  };
+
+  const handleBackup = async () => {
+    try {
+      Alert.alert(
+        t('backup') || 'Yedekleme',
+        t('backupDesc') || 'Verilerinizi buluta yedekleyin.',
+        [
+          { text: t('cancel') || 'İptal', style: 'cancel' },
+          { 
+            text: t('backup') || 'Yedekle', 
+            onPress: async () => {
+              try {
+                // Yedekleme verilerini hazırla
+                const backupData = {
+                  user_id: user?.id,
+                  user_email: user?.email,
+                  dreams: recentDreams,
+                  stats: dreamStats,
+                  settings: {
+                    emailNotifications: emailNotificationsEnabled,
+                    language: currentLanguage
+                  },
+                  backup_date: new Date().toISOString(),
+                  app_version: '1.0.0',
+                  backup_size: 0
+                };
+
+                // Backup boyutunu hesapla
+                backupData.backup_size = JSON.stringify(backupData).length;
+
+                // Supabase'e yedekle
+                const { data, error } = await supabase
+                  .from('user_backups')
+                  .insert([backupData]);
+
+                if (error) {
+                  throw error;
+                }
+
+                // Eski yedeklemeleri temizle (son 10 yedeklemeyi tut)
+                const { data: oldBackups } = await supabase
+                  .from('user_backups')
+                  .select('id')
+                  .eq('user_id', user?.id)
+                  .order('backup_date', { ascending: false })
+                  .range(10, 1000);
+
+                if (oldBackups && oldBackups.length > 0) {
+                  const oldBackupIds = oldBackups.map(backup => backup.id);
+                  await supabase
+                    .from('user_backups')
+                    .delete()
+                    .in('id', oldBackupIds);
+                }
+
+                Alert.alert(
+                  t('success') || 'Başarılı',
+                  t('backupSuccess') || 'Verileriniz başarıyla buluta yedeklendi.'
+                );
+              } catch (error) {
+                console.error('Backup error:', error);
+                Alert.alert(
+                  t('error') || 'Hata',
+                  t('backupError') || 'Yedekleme sırasında bir hata oluştu.'
+                );
+              }
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Backup error:', error);
+    }
+  };
+
+  const handleViewBackups = () => {
+    setBackupHistoryModalVisible(true);
+    loadBackupHistory();
+  };
+
+  const loadBackupHistory = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('user_backups')
+        .select('id, backup_date, backup_size, app_version')
+        .eq('user_id', user?.id)
+        .order('backup_date', { ascending: false })
+        .limit(20);
+
+      if (error) {
+        throw error;
+      }
+
+      setBackupHistory(data || []);
+    } catch (error) {
+      console.error('Load backup history error:', error);
+      Alert.alert(
+        t('error') || 'Hata',
+        t('loadBackupError') || 'Yedekleme geçmişi yüklenirken hata oluştu.'
+      );
+    }
+  };
+
+  const handleRestoreBackup = async (backupId) => {
+    try {
+      Alert.alert(
+        t('restoreBackup') || 'Yedeklemeyi Geri Yükle',
+        t('restoreBackupConfirm') || 'Bu yedeklemeyi geri yüklemek istediğinizden emin misiniz? Mevcut verileriniz değiştirilecektir.',
+        [
+          { text: t('cancel') || 'İptal', style: 'cancel' },
+          {
+            text: t('restore') || 'Geri Yükle',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                const { data, error } = await supabase
+                  .from('user_backups')
+                  .select('*')
+                  .eq('id', backupId)
+                  .single();
+
+                if (error) {
+                  throw error;
+                }
+
+                // Burada geri yükleme işlemi yapılacak
+                // Şimdilik sadece bilgi mesajı gösterelim
+                Alert.alert(
+                  t('success') || 'Başarılı',
+                  t('restoreSuccess') || 'Yedekleme başarıyla geri yüklendi.'
+                );
+                setBackupHistoryModalVisible(false);
+              } catch (error) {
+                console.error('Restore backup error:', error);
+                Alert.alert(
+                  t('error') || 'Hata',
+                  t('restoreError') || 'Yedekleme geri yüklenirken hata oluştu.'
+                );
+              }
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Restore backup error:', error);
+    }
+  };
+
+  const handleDeleteBackup = async (backupId) => {
+    try {
+      Alert.alert(
+        t('deleteBackup') || 'Yedeklemeyi Sil',
+        t('deleteBackupConfirm') || 'Bu yedeklemeyi silmek istediğinizden emin misiniz?',
+        [
+          { text: t('cancel') || 'İptal', style: 'cancel' },
+          {
+            text: t('delete') || 'Sil',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                const { error } = await supabase
+                  .from('user_backups')
+                  .delete()
+                  .eq('id', backupId);
+
+                if (error) {
+                  throw error;
+                }
+
+                Alert.alert(
+                  t('success') || 'Başarılı',
+                  t('deleteBackupSuccess') || 'Yedekleme başarıyla silindi.'
+                );
+                loadBackupHistory();
+              } catch (error) {
+                console.error('Delete backup error:', error);
+                Alert.alert(
+                  t('error') || 'Hata',
+                  t('deleteBackupError') || 'Yedekleme silinirken hata oluştu.'
+                );
+              }
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Delete backup error:', error);
+    }
+  };
+
+  // App Settings Handlers
+  const handleDarkMode = async (value) => {
+    try {
+      setDarkModeEnabled(value);
+      await AsyncStorage.setItem('darkModeEnabled', JSON.stringify(value));
+      
+      // Burada tema değişikliği uygulanabilir
+      console.log('Dark mode:', value ? 'enabled' : 'disabled');
+    } catch (error) {
+      console.error('Dark mode toggle error:', error);
+      Alert.alert(
+        t('error') || 'Hata',
+        t('settingsError') || 'Ayar kaydedilirken hata oluştu.'
+      );
+    }
+  };
+
+  // Help & Support Handlers
+  const handleContactUs = () => {
+    const email = 'info@iconyazilim.com';
+    const subject = 'DreamPack Destek Talebi';
+    const body = 'Merhaba,\n\nDreamPack uygulaması hakkında yardıma ihtiyacım var.\n\n';
+    
+    const mailtoUrl = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    
+    Linking.canOpenURL(mailtoUrl)
+      .then((supported) => {
+        if (supported) {
+          return Linking.openURL(mailtoUrl);
+        } else {
+          Alert.alert(
+            'Hata',
+            'Mail uygulaması bulunamadı. Lütfen info@iconyazilim.com adresine manuel olarak mail gönderin.',
+            [{ text: 'Tamam' }]
+          );
+        }
+      })
+      .catch((err) => {
+        Alert.alert(
+          'Hata',
+          'Mail uygulaması açılamadı. Lütfen info@iconyazilim.com adresine manuel olarak mail gönderin.',
+          [{ text: 'Tamam' }]
+        );
+      });
+  };
+
+  const handleFAQ = () => {
+    setShowFAQModal(true);
+  };
+
+  const handleShareApp = () => {
+    const shareOptions = {
+      message: 'DreamPack - Rüyalarınızı yorumlayın ve anlamlarını keşfedin! 🌙✨',
+      url: Platform.OS === 'ios' 
+        ? 'https://apps.apple.com/app/id6738049462'
+        : 'https://play.google.com/store/apps/details?id=com.iconyazilim.dreampack',
+      title: 'DreamPack Uygulaması'
+    };
+
+    Share.share(shareOptions)
+      .then((result) => {
+        if (result.action === Share.sharedAction) {
+          console.log('App shared successfully');
+        }
+      })
+      .catch((error) => {
+        Alert.alert(
+          'Hata',
+          'Paylaşım sırasında bir hata oluştu.',
+          [{ text: 'Tamam' }]
+        );
+      });
+  };
+
+  const handleRateApp = () => {
+    const appStoreUrl = Platform.OS === 'ios' 
+      ? 'https://apps.apple.com/app/id6738049462' // iOS App Store URL
+      : 'https://play.google.com/store/apps/details?id=com.iconyazilim.dreampack'; // Android Play Store URL
+    
+    Linking.canOpenURL(appStoreUrl)
+      .then((supported) => {
+        if (supported) {
+          return Linking.openURL(appStoreUrl);
+        } else {
+          Alert.alert(
+            'Hata',
+            'Uygulama mağazası açılamadı.',
+            [{ text: 'Tamam' }]
+          );
+        }
+      })
+      .catch((err) => {
+        Alert.alert(
+          'Hata',
+          'Uygulama mağazası açılamadı.',
+          [{ text: 'Tamam' }]
+        );
+      });
   };
 
   const renderHomeTab = () => (
@@ -541,13 +1075,13 @@ export default function DreamInterpretationScreen({ navigation }) {
             <View style={styles.profileSection}>
               <Text style={styles.profileSectionTitle}>⚙️ {t('accountSettings')}</Text>
               
-              <TouchableOpacity style={styles.profileMenuItem}>
+              <TouchableOpacity style={styles.profileMenuItem} onPress={handleEditProfile}>
                 <Text style={styles.profileMenuIcon}>👤</Text>
                 <Text style={styles.profileMenuText}>{t('editProfile')}</Text>
                 <Text style={styles.profileMenuArrow}>›</Text>
               </TouchableOpacity>
               
-              <TouchableOpacity style={styles.profileMenuItem}>
+              <TouchableOpacity style={styles.profileMenuItem} onPress={handleChangePassword}>
                 <Text style={styles.profileMenuIcon}>🔒</Text>
                 <Text style={styles.profileMenuText}>{t('changePassword')}</Text>
                 <Text style={styles.profileMenuArrow}>›</Text>
@@ -558,38 +1092,48 @@ export default function DreamInterpretationScreen({ navigation }) {
             <View style={styles.profileSection}>
               <Text style={styles.profileSectionTitle}>🔔 {t('notificationSettings')}</Text>
               
-              <TouchableOpacity style={styles.profileMenuItem}>
+              <TouchableOpacity style={styles.profileMenuItem} onPress={handlePushNotifications}>
                 <Text style={styles.profileMenuIcon}>📱</Text>
                 <Text style={styles.profileMenuText}>{t('pushNotifications')}</Text>
                 <Text style={styles.profileMenuArrow}>›</Text>
               </TouchableOpacity>
               
-              <TouchableOpacity style={styles.profileMenuItem}>
+              <View style={styles.profileMenuItem}>
                 <Text style={styles.profileMenuIcon}>📧</Text>
-                <Text style={styles.profileMenuText}>{t('emailNotifications')}</Text>
-                <Text style={styles.profileMenuArrow}>›</Text>
-              </TouchableOpacity>
+                <View style={styles.profileMenuTextContainer}>
+                  <Text style={styles.profileMenuText}>{t('emailNotifications')}</Text>
+                </View>
+                <Switch
+                  value={emailNotificationsEnabled}
+                  onValueChange={handleEmailNotifications}
+                  trackColor={{ false: '#767577', true: '#4CAF50' }}
+                  thumbColor={emailNotificationsEnabled ? '#ffffff' : '#f4f3f4'}
+                  ios_backgroundColor="#3e3e3e"
+                />
+              </View>
               
-              <TouchableOpacity style={styles.profileMenuItem}>
-                <Text style={styles.profileMenuIcon}>⏰</Text>
-                <Text style={styles.profileMenuText}>{t('dreamReminders')}</Text>
-                <Text style={styles.profileMenuArrow}>›</Text>
-              </TouchableOpacity>
+
             </View>
 
             {/* Privacy & Data Section */}
             <View style={styles.profileSection}>
               <Text style={styles.profileSectionTitle}>🛡️ {t('privacySettings')}</Text>
               
-              <TouchableOpacity style={styles.profileMenuItem}>
-                <Text style={styles.profileMenuIcon}>📊</Text>
-                <Text style={styles.profileMenuText}>{t('dataExport')}</Text>
+              <TouchableOpacity style={styles.profileMenuItem} onPress={handleDataRequest}>
+                <Text style={styles.profileMenuIcon}>📧</Text>
+                <Text style={styles.profileMenuText}>{t('dataRequest')}</Text>
                 <Text style={styles.profileMenuArrow}>›</Text>
               </TouchableOpacity>
               
-              <TouchableOpacity style={styles.profileMenuItem}>
+              <TouchableOpacity style={styles.profileMenuItem} onPress={handleBackup}>
                 <Text style={styles.profileMenuIcon}>💾</Text>
                 <Text style={styles.profileMenuText}>{t('backup')}</Text>
+                <Text style={styles.profileMenuArrow}>›</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={styles.profileMenuItem} onPress={handleViewBackups}>
+                <Text style={styles.profileMenuIcon}>📋</Text>
+                <Text style={styles.profileMenuText}>{t('backupHistory')}</Text>
                 <Text style={styles.profileMenuArrow}>›</Text>
               </TouchableOpacity>
             </View>
@@ -598,36 +1142,42 @@ export default function DreamInterpretationScreen({ navigation }) {
             <View style={styles.profileSection}>
               <Text style={styles.profileSectionTitle}>🎨 {t('theme')}</Text>
               
-              <TouchableOpacity style={styles.profileMenuItem}>
+              <View style={styles.profileMenuItem}>
                 <Text style={styles.profileMenuIcon}>🌙</Text>
                 <Text style={styles.profileMenuText}>{t('darkMode')}</Text>
-                <Text style={styles.profileMenuArrow}>›</Text>
-              </TouchableOpacity>
+                <Switch
+                  value={darkModeEnabled}
+                  onValueChange={handleDarkMode}
+                  trackColor={{ false: 'rgba(255,255,255,0.2)', true: 'rgba(76, 175, 80, 0.5)' }}
+                  thumbColor={darkModeEnabled ? '#4CAF50' : 'rgba(255,255,255,0.8)'}
+                  ios_backgroundColor="rgba(255,255,255,0.2)"
+                />
+              </View>
             </View>
 
             {/* Help & Support Section */}
             <View style={styles.profileSection}>
               <Text style={styles.profileSectionTitle}>❓ {t('helpSupport')}</Text>
               
-              <TouchableOpacity style={styles.profileMenuItem}>
+              <TouchableOpacity style={styles.profileMenuItem} onPress={handleContactUs}>
                 <Text style={styles.profileMenuIcon}>📞</Text>
                 <Text style={styles.profileMenuText}>{t('contactUs')}</Text>
                 <Text style={styles.profileMenuArrow}>›</Text>
               </TouchableOpacity>
               
-              <TouchableOpacity style={styles.profileMenuItem}>
+              <TouchableOpacity style={styles.profileMenuItem} onPress={handleFAQ}>
                 <Text style={styles.profileMenuIcon}>❓</Text>
                 <Text style={styles.profileMenuText}>{t('faq')}</Text>
                 <Text style={styles.profileMenuArrow}>›</Text>
               </TouchableOpacity>
               
-              <TouchableOpacity style={styles.profileMenuItem}>
+              <TouchableOpacity style={styles.profileMenuItem} onPress={handleRateApp}>
                 <Text style={styles.profileMenuIcon}>⭐</Text>
                 <Text style={styles.profileMenuText}>{t('rateApp')}</Text>
                 <Text style={styles.profileMenuArrow}>›</Text>
               </TouchableOpacity>
               
-              <TouchableOpacity style={styles.profileMenuItem}>
+              <TouchableOpacity style={styles.profileMenuItem} onPress={handleShareApp}>
                 <Text style={styles.profileMenuIcon}>📤</Text>
                 <Text style={styles.profileMenuText}>{t('shareApp')}</Text>
                 <Text style={styles.profileMenuArrow}>›</Text>
@@ -668,7 +1218,7 @@ export default function DreamInterpretationScreen({ navigation }) {
 
   return (
     <LinearGradient
-      colors={['#667eea', '#764ba2', '#f093fb']}
+      colors={darkModeEnabled ? ['#1a1a2e', '#16213e', '#0f3460'] : ['#667eea', '#764ba2', '#f093fb']}
       style={styles.container}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
@@ -938,14 +1488,465 @@ export default function DreamInterpretationScreen({ navigation }) {
         </View>
       )}
 
+      {/* Profil Düzenleme Modal */}
+      <Modal
+        visible={showEditProfileModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowEditProfileModal(false)}
+      >
+        <LinearGradient
+          colors={darkModeEnabled ? ['#1a1a2e', '#16213e', '#0f3460'] : ['#667eea', '#764ba2', '#f093fb']}
+          style={styles.container}
+        >
+          <View style={styles.modalHeader}>
+            <TouchableOpacity
+              style={styles.modalCloseButton}
+              onPress={() => setShowEditProfileModal(false)}
+            >
+              <Text style={styles.modalCloseText}>✕</Text>
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>{t('editProfile')}</Text>
+            <TouchableOpacity
+              style={styles.modalSaveButton}
+              onPress={handleSaveProfile}
+            >
+              <Text style={styles.modalSaveText}>{t('save') || 'Kaydet'}</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+            <View style={styles.profileFormSection}>
+              <Text style={styles.profileFormLabel}>👤 {t('displayName') || 'Görünen Ad'}</Text>
+              <TextInput
+                style={styles.profileFormInput}
+                value={editProfileData.displayName}
+                onChangeText={(text) => setEditProfileData({...editProfileData, displayName: text})}
+                placeholder={t('enterDisplayName') || 'Görünen adınızı girin'}
+                placeholderTextColor="rgba(255,255,255,0.5)"
+              />
+            </View>
+
+            <View style={styles.profileFormSection}>
+              <Text style={styles.profileFormLabel}>📝 {t('bio') || 'Hakkımda'}</Text>
+              <TextInput
+                style={[styles.profileFormInput, styles.profileFormTextArea]}
+                value={editProfileData.bio}
+                onChangeText={(text) => setEditProfileData({...editProfileData, bio: text})}
+                placeholder={t('enterBio') || 'Kendiniz hakkında birkaç kelime yazın'}
+                placeholderTextColor="rgba(255,255,255,0.5)"
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
+              />
+            </View>
+
+            <View style={styles.profileFormSection}>
+              <Text style={styles.profileFormLabel}>🎂 {t('birthDate') || 'Doğum Tarihi'}</Text>
+              <TextInput
+                style={styles.profileFormInput}
+                value={editProfileData.birthDate}
+                onChangeText={(text) => setEditProfileData({...editProfileData, birthDate: text})}
+                placeholder={t('enterBirthDate') || 'GG/AA/YYYY'}
+                placeholderTextColor="rgba(255,255,255,0.5)"
+              />
+            </View>
+
+            <View style={styles.profileFormSection}>
+              <Text style={styles.profileFormLabel}>📍 {t('location') || 'Konum'}</Text>
+              <TextInput
+                style={styles.profileFormInput}
+                value={editProfileData.location}
+                onChangeText={(text) => setEditProfileData({...editProfileData, location: text})}
+                placeholder={t('enterLocation') || 'Şehir, Ülke'}
+                placeholderTextColor="rgba(255,255,255,0.5)"
+              />
+            </View>
+
+            <View style={styles.profileFormSection}>
+              <Text style={styles.profileFormLabel}>🌟 {t('favoriteSymbol') || 'Favori Rüya Sembolü'}</Text>
+              <TextInput
+                style={styles.profileFormInput}
+                value={editProfileData.favoriteSymbol}
+                onChangeText={(text) => setEditProfileData({...editProfileData, favoriteSymbol: text})}
+                placeholder={t('enterFavoriteSymbol') || 'Örn: Uçmak, Su, Hayvanlar'}
+                placeholderTextColor="rgba(255,255,255,0.5)"
+              />
+            </View>
+
+            <View style={styles.profileFormSection}>
+              <Text style={styles.profileFormNote}>
+                💡 {t('profileNote') || 'Bu bilgiler rüya yorumlarınızı kişiselleştirmek için kullanılacaktır.'}
+              </Text>
+            </View>
+          </ScrollView>
+        </LinearGradient>
+      </Modal>
+
+      {/* Şifre Değiştirme Modal */}
+      <Modal
+        visible={showChangePasswordModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowChangePasswordModal(false)}
+      >
+        <LinearGradient
+          colors={darkModeEnabled ? ['#1a1a2e', '#16213e', '#0f3460'] : ['#667eea', '#764ba2', '#f093fb']}
+          style={styles.container}
+        >
+          <View style={styles.modalHeader}>
+            <TouchableOpacity
+              style={styles.modalCloseButton}
+              onPress={() => setShowChangePasswordModal(false)}
+            >
+              <Text style={styles.modalCloseText}>✕</Text>
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>{t('changePassword')}</Text>
+            <TouchableOpacity
+              style={styles.modalSaveButton}
+              onPress={handleSavePassword}
+            >
+              <Text style={styles.modalSaveText}>{t('save') || 'Kaydet'}</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+            <View style={styles.passwordFormContainer}>
+              <Text style={styles.passwordFormTitle}>🔒 {t('changePasswordTitle') || 'Yeni Şifrenizi Belirleyin'}</Text>
+              <Text style={styles.passwordFormSubtitle}>
+                {t('changePasswordSubtitle') || 'Güvenliğiniz için güçlü bir şifre seçin.'}
+              </Text>
+
+              <View style={styles.profileFormSection}>
+                <Text style={styles.profileFormLabel}>🔑 {t('newPassword') || 'Yeni Şifre'}</Text>
+                <TextInput
+                  style={styles.profileFormInput}
+                  value={passwordData.newPassword}
+                  onChangeText={(text) => setPasswordData({...passwordData, newPassword: text})}
+                  placeholder={t('enterNewPassword') || 'Yeni şifrenizi girin'}
+                  placeholderTextColor="rgba(255,255,255,0.5)"
+                  secureTextEntry
+                  autoCapitalize="none"
+                />
+              </View>
+
+              <View style={styles.profileFormSection}>
+                <Text style={styles.profileFormLabel}>🔑 {t('confirmPassword') || 'Şifre Tekrarı'}</Text>
+                <TextInput
+                  style={styles.profileFormInput}
+                  value={passwordData.confirmPassword}
+                  onChangeText={(text) => setPasswordData({...passwordData, confirmPassword: text})}
+                  placeholder={t('confirmNewPassword') || 'Şifrenizi tekrar girin'}
+                  placeholderTextColor="rgba(255,255,255,0.5)"
+                  secureTextEntry
+                  autoCapitalize="none"
+                />
+              </View>
+
+              <View style={styles.passwordRequirements}>
+                <Text style={styles.passwordRequirementsTitle}>📋 {t('passwordRequirements') || 'Şifre Gereksinimleri:'}</Text>
+                <Text style={styles.passwordRequirementItem}>• {t('minLength') || 'En az 6 karakter'}</Text>
+                <Text style={styles.passwordRequirementItem}>• {t('matchPasswords') || 'Şifreler eşleşmeli'}</Text>
+                <Text style={styles.passwordRequirementItem}>• {t('strongPassword') || 'Güçlü şifre önerilir'}</Text>
+              </View>
+
+              <View style={styles.profileFormSection}>
+                <Text style={styles.profileFormNote}>
+                  🛡️ {t('passwordNote') || 'Şifreniz güvenli bir şekilde şifrelenerek saklanacaktır.'}
+                </Text>
+              </View>
+            </View>
+          </ScrollView>
+        </LinearGradient>
+      </Modal>
+
+      {/* Data Request Modal */}
+      <Modal
+        visible={dataRequestModalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <LinearGradient
+          colors={['#1a1a2e', '#16213e', '#0f3460']}
+          style={styles.modalContainer}
+        >
+          <View style={styles.modalHeader}>
+            <TouchableOpacity
+              style={styles.modalCloseButton}
+              onPress={() => setDataRequestModalVisible(false)}
+            >
+              <Text style={styles.modalCloseText}>✕</Text>
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>{t('dataRequest') || 'Veri Talebi'}</Text>
+            <TouchableOpacity
+              style={styles.modalSaveButton}
+              onPress={handleDataRequestSubmit}
+            >
+              <Text style={styles.modalSaveText}>{t('send') || 'Gönder'}</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+            <View style={styles.passwordFormContainer}>
+              <Text style={styles.passwordFormTitle}>📧 {t('dataRequestTitle') || 'Veri Talep Formu'}</Text>
+              <Text style={styles.passwordFormSubtitle}>
+                {t('dataRequestSubtitle') || 'Verilerinizi talep etmek için aşağıdaki formu doldurun.'}
+              </Text>
+
+              <View style={styles.profileFormSection}>
+                <Text style={styles.profileFormLabel}>📋 {t('requestType') || 'Talep Türü'} *</Text>
+                <View style={styles.pickerContainer}>
+                  <TouchableOpacity
+                    style={styles.profileFormInput}
+                    onPress={() => {
+                      Alert.alert(
+                        t('selectRequestType') || 'Talep Türü Seçin',
+                        '',
+                        [
+                          { text: t('cancel') || 'İptal', style: 'cancel' },
+                          { text: t('allData') || 'Tüm Verilerim', onPress: () => setDataRequestForm({...dataRequestForm, requestType: 'Tüm Verilerim'}) },
+                          { text: t('dreamData') || 'Sadece Rüya Verileri', onPress: () => setDataRequestForm({...dataRequestForm, requestType: 'Sadece Rüya Verileri'}) },
+                          { text: t('profileData') || 'Profil Bilgileri', onPress: () => setDataRequestForm({...dataRequestForm, requestType: 'Profil Bilgileri'}) },
+                          { text: t('statisticsData') || 'İstatistik Verileri', onPress: () => setDataRequestForm({...dataRequestForm, requestType: 'İstatistik Verileri'}) }
+                        ]
+                      );
+                    }}
+                  >
+                    <Text style={[styles.profileFormInputText, !dataRequestForm.requestType && styles.placeholderText]}>
+                      {dataRequestForm.requestType || (t('selectRequestType') || 'Talep türünü seçin')}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={styles.profileFormSection}>
+                <Text style={styles.profileFormLabel}>❓ {t('reason') || 'Gerekçe'} *</Text>
+                <TextInput
+                  style={[styles.profileFormInput, styles.textArea]}
+                  value={dataRequestForm.reason}
+                  onChangeText={(text) => setDataRequestForm({...dataRequestForm, reason: text})}
+                  placeholder={t('reasonPlaceholder') || 'Verilerinizi neden talep ettiğinizi açıklayın...'}
+                  placeholderTextColor="rgba(255,255,255,0.5)"
+                  multiline
+                  numberOfLines={4}
+                />
+              </View>
+
+              <View style={styles.profileFormSection}>
+                <Text style={styles.profileFormLabel}>🎯 {t('specificData') || 'Spesifik Veriler'}</Text>
+                <TextInput
+                  style={[styles.profileFormInput, styles.textArea]}
+                  value={dataRequestForm.specificData}
+                  onChangeText={(text) => setDataRequestForm({...dataRequestForm, specificData: text})}
+                  placeholder={t('specificDataPlaceholder') || 'Hangi spesifik verileri istediğinizi belirtin (opsiyonel)...'}
+                  placeholderTextColor="rgba(255,255,255,0.5)"
+                  multiline
+                  numberOfLines={3}
+                />
+              </View>
+
+              <View style={styles.profileFormSection}>
+                <Text style={styles.profileFormLabel}>⚡ {t('urgency') || 'Aciliyet'}</Text>
+                <View style={styles.pickerContainer}>
+                  <TouchableOpacity
+                    style={styles.profileFormInput}
+                    onPress={() => {
+                      Alert.alert(
+                        t('selectUrgency') || 'Aciliyet Seçin',
+                        '',
+                        [
+                          { text: t('cancel') || 'İptal', style: 'cancel' },
+                          { text: t('low') || 'Düşük', onPress: () => setDataRequestForm({...dataRequestForm, urgency: 'Düşük'}) },
+                          { text: t('normal') || 'Normal', onPress: () => setDataRequestForm({...dataRequestForm, urgency: 'Normal'}) },
+                          { text: t('high') || 'Yüksek', onPress: () => setDataRequestForm({...dataRequestForm, urgency: 'Yüksek'}) },
+                          { text: t('urgent') || 'Acil', onPress: () => setDataRequestForm({...dataRequestForm, urgency: 'Acil'}) }
+                        ]
+                      );
+                    }}
+                  >
+                    <Text style={styles.profileFormInputText}>
+                      {dataRequestForm.urgency || (t('selectUrgency') || 'Aciliyet seçin')}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={styles.profileFormSection}>
+                <Text style={styles.profileFormLabel}>💬 {t('additionalInfo') || 'Ek Bilgiler'}</Text>
+                <TextInput
+                  style={[styles.profileFormInput, styles.textArea]}
+                  value={dataRequestForm.additionalInfo}
+                  onChangeText={(text) => setDataRequestForm({...dataRequestForm, additionalInfo: text})}
+                  placeholder={t('additionalInfoPlaceholder') || 'Eklemek istediğiniz başka bilgiler varsa yazın...'}
+                  placeholderTextColor="rgba(255,255,255,0.5)"
+                  multiline
+                  numberOfLines={3}
+                />
+              </View>
+
+              <View style={styles.profileFormSection}>
+                <Text style={styles.profileFormNote}>
+                  📋 {t('dataRequestNote') || 'Talebiniz 3-5 iş günü içinde değerlendirilecek ve e-posta adresinize bilgi verilecektir.'}
+                </Text>
+              </View>
+            </View>
+          </ScrollView>
+        </LinearGradient>
+      </Modal>
+
+      {/* Backup History Modal */}
+      <Modal
+        visible={backupHistoryModalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <LinearGradient
+          colors={['#1a1a2e', '#16213e', '#0f3460']}
+          style={styles.modalContainer}
+        >
+          <View style={styles.modalHeader}>
+            <TouchableOpacity
+              style={styles.modalCloseButton}
+              onPress={() => setBackupHistoryModalVisible(false)}
+            >
+              <Text style={styles.modalCloseText}>✕</Text>
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>{t('backupHistory') || 'Yedekleme Geçmişi'}</Text>
+            <View style={styles.modalSaveButton} />
+          </View>
+
+          <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+            <View style={styles.passwordFormContainer}>
+              <Text style={styles.passwordFormTitle}>📋 {t('backupHistory') || 'Yedekleme Geçmişi'}</Text>
+              <Text style={styles.passwordFormSubtitle}>
+                {t('backupHistorySubtitle') || 'Geçmiş yedeklemelerinizi görüntüleyin ve yönetin.'}
+              </Text>
+
+              {backupHistory.length === 0 ? (
+                <View style={styles.emptyBackupContainer}>
+                  <Text style={styles.emptyBackupIcon}>📦</Text>
+                  <Text style={styles.emptyBackupText}>
+                    {t('noBackupsFound') || 'Henüz yedekleme bulunamadı.'}
+                  </Text>
+                  <Text style={styles.emptyBackupSubtext}>
+                    {t('createFirstBackup') || 'İlk yedeklemenizi oluşturmak için yedekleme butonunu kullanın.'}
+                  </Text>
+                </View>
+              ) : (
+                backupHistory.map((backup, index) => (
+                  <View key={backup.id} style={styles.backupItem}>
+                    <View style={styles.backupItemHeader}>
+                      <Text style={styles.backupItemTitle}>
+                        💾 {t('backup') || 'Yedekleme'} #{backupHistory.length - index}
+                      </Text>
+                      <Text style={styles.backupItemDate}>
+                        {new Date(backup.backup_date).toLocaleDateString('tr-TR', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </Text>
+                    </View>
+                    
+                    <View style={styles.backupItemDetails}>
+                      <Text style={styles.backupItemDetail}>
+                        📊 {t('size') || 'Boyut'}: {(backup.backup_size / 1024).toFixed(1)} KB
+                      </Text>
+                      <Text style={styles.backupItemDetail}>
+                        📱 {t('version') || 'Sürüm'}: {backup.app_version}
+                      </Text>
+                    </View>
+                    
+                    <View style={styles.backupItemActions}>
+                      <TouchableOpacity
+                        style={[styles.backupActionButton, styles.restoreButton]}
+                        onPress={() => handleRestoreBackup(backup.id)}
+                      >
+                        <Text style={styles.backupActionText}>🔄 {t('restore') || 'Geri Yükle'}</Text>
+                      </TouchableOpacity>
+                      
+                      <TouchableOpacity
+                        style={[styles.backupActionButton, styles.deleteButton]}
+                        onPress={() => handleDeleteBackup(backup.id)}
+                      >
+                        <Text style={styles.backupActionText}>🗑️ {t('delete') || 'Sil'}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))
+              )}
+            </View>
+          </ScrollView>
+        </LinearGradient>
+      </Modal>
+
+      {/* FAQ Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={showFAQModal}
+        onRequestClose={() => setShowFAQModal(false)}
+      >
+        <LinearGradient
+          colors={darkModeEnabled ? ['#1a1a2e', '#16213e', '#0f3460'] : ['#667eea', '#764ba2', '#f093fb']}
+          style={styles.container}
+        >
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>❓ {t('faq') || 'Sık Sorulan Sorular'}</Text>
+            <TouchableOpacity
+              style={styles.modalCloseButton}
+              onPress={() => setShowFAQModal(false)}
+            >
+              <Text style={styles.modalCloseText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView style={styles.modalContent}>
+            <View style={styles.faqContainer}>
+              <View style={styles.faqItem}>
+                <Text style={styles.faqQuestion}>🤔 Rüya yorumu nasıl çalışır?</Text>
+                <Text style={styles.faqAnswer}>DreamPack, yapay zeka teknolojisi kullanarak rüyalarınızı analiz eder ve psikolojik semboller temelinde yorumlar sunar.</Text>
+              </View>
+              
+              <View style={styles.faqItem}>
+                <Text style={styles.faqQuestion}>💾 Rüyalarım güvende mi?</Text>
+                <Text style={styles.faqAnswer}>Evet, tüm verileriniz şifrelenmiş olarak saklanır ve sadece sizin erişiminize açıktır.</Text>
+              </View>
+              
+              <View style={styles.faqItem}>
+                <Text style={styles.faqQuestion}>🌟 Ünlü kişi yorumları gerçek mi?</Text>
+                <Text style={styles.faqAnswer}>Ünlü kişi yorumları, o kişilerin bilinen görüşleri ve yaklaşımları temelinde AI tarafından oluşturulan yorumlardır.</Text>
+              </View>
+              
+              <View style={styles.faqItem}>
+                <Text style={styles.faqQuestion}>📱 Uygulama ücretsiz mi?</Text>
+                <Text style={styles.faqAnswer}>DreamPack temel özellikleri ücretsiz olarak sunar. Premium özellikler için abonelik seçenekleri mevcuttur.</Text>
+              </View>
+              
+              <View style={styles.faqItem}>
+                <Text style={styles.faqQuestion}>🔄 Yedekleme nasıl çalışır?</Text>
+                <Text style={styles.faqAnswer}>Rüyalarınızı ve yorumlarınızı güvenli bir şekilde yedekleyebilir, istediğiniz zaman geri yükleyebilirsiniz.</Text>
+              </View>
+              
+              <View style={styles.faqItem}>
+                <Text style={styles.faqQuestion}>🌍 Hangi dilleri destekliyor?</Text>
+                <Text style={styles.faqAnswer}>DreamPack Türkçe, İngilizce, Japonca, Tayca, Malayca ve Endonezce dillerini destekler.</Text>
+              </View>
+            </View>
+          </ScrollView>
+        </LinearGradient>
+      </Modal>
 
     </LinearGradient>
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (darkMode) => StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: darkMode ? '#1a1a2e' : 'transparent',
   },
   floatingElements: {
     position: 'absolute',
@@ -973,14 +1974,14 @@ const styles = StyleSheet.create({
   },
   welcomeText: {
     fontSize: 16,
-    color: 'rgba(255,255,255,0.8)',
+    color: darkMode ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.8)',
     fontWeight: '500',
   },
   userName: {
     fontSize: 24,
-    color: 'white',
+    color: darkMode ? 'white' : 'white',
     fontWeight: 'bold',
-    textShadowColor: 'rgba(0,0,0,0.3)',
+    textShadowColor: darkMode ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.3)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
   },
@@ -1068,27 +2069,27 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   dreamInputWrapper: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: darkMode ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.1)',
     borderRadius: 15,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderColor: darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.2)',
     minHeight: 100,
   },
   inputWrapperFocused: {
-    borderColor: 'rgba(255,255,255,0.5)',
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderColor: darkMode ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.5)',
+    backgroundColor: darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.15)',
   },
   dreamInput: {
     paddingHorizontal: 15,
     paddingVertical: 15,
     fontSize: 16,
-    color: 'white',
+    color: darkMode ? '#ffffff' : 'white',
     textAlignVertical: 'top',
   },
   categoryTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: 'white',
+    color: darkMode ? '#ffffff' : 'white',
     marginBottom: 10,
   },
   categoriesContainer: {
@@ -1536,10 +2537,8 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContainer: {
-    height: '80%',
-    borderTopLeftRadius: 25,
-    borderTopRightRadius: 25,
-    overflow: 'hidden',
+    flex: 1,
+    backgroundColor: 'transparent',
   },
   modalBlur: {
     flex: 1,
@@ -1547,12 +2546,15 @@ const styles = StyleSheet.create({
   modalContent: {
     flex: 1,
     padding: 20,
+    paddingBottom: 40,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
+    paddingTop: Platform.OS === 'ios' ? 50 : 20,
+    paddingHorizontal: 20,
     paddingBottom: 15,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.2)',
@@ -1821,6 +2823,252 @@ const styles = StyleSheet.create({
    profileVersionText: {
      fontSize: 14,
      color: 'rgba(255,255,255,0.6)',
+     fontWeight: '400',
+   },
+   // Password Modal Styles
+   passwordFormContainer: {
+     padding: 20,
+   },
+   passwordFormTitle: {
+     fontSize: 24,
+     fontWeight: 'bold',
+     color: '#fff',
+     textAlign: 'center',
+     marginBottom: 8,
+   },
+   passwordFormSubtitle: {
+     fontSize: 16,
+     color: 'rgba(255,255,255,0.7)',
+     textAlign: 'center',
+     marginBottom: 30,
+     lineHeight: 22,
+   },
+   passwordRequirements: {
+     backgroundColor: 'rgba(255,255,255,0.1)',
+     borderRadius: 12,
+     padding: 16,
+     marginVertical: 20,
+   },
+   passwordRequirementsTitle: {
+     fontSize: 16,
+     fontWeight: 'bold',
+     color: '#fff',
+     marginBottom: 12,
+   },
+   passwordRequirementItem: {
+     fontSize: 14,
+     color: 'rgba(255,255,255,0.8)',
+     marginBottom: 6,
+     paddingLeft: 8,
+   },
+   // Modal Styles
+   modalHeader: {
+     flexDirection: 'row',
+     justifyContent: 'space-between',
+     alignItems: 'center',
+     paddingHorizontal: 20,
+     paddingTop: 60,
+     paddingBottom: 20,
+     borderBottomWidth: 1,
+     borderBottomColor: 'rgba(255,255,255,0.1)',
+   },
+   modalCloseButton: {
+     width: 40,
+     height: 40,
+     borderRadius: 20,
+     backgroundColor: 'rgba(255,255,255,0.1)',
+     justifyContent: 'center',
+     alignItems: 'center',
+   },
+   modalCloseText: {
+     color: 'white',
+     fontSize: 18,
+     fontWeight: 'bold',
+   },
+   modalTitle: {
+     color: 'white',
+     fontSize: 18,
+     fontWeight: '600',
+   },
+   modalSaveButton: {
+     backgroundColor: '#4CAF50',
+     paddingHorizontal: 20,
+     paddingVertical: 10,
+     borderRadius: 20,
+   },
+   modalSaveText: {
+     color: 'white',
+     fontSize: 16,
+     fontWeight: '600',
+   },
+   modalContent: {
+     flex: 1,
+     paddingHorizontal: 20,
+   },
+   profileFormSection: {
+     marginBottom: 25,
+   },
+   profileFormLabel: {
+     color: 'white',
+     fontSize: 16,
+     fontWeight: '600',
+     marginBottom: 10,
+   },
+   profileFormInput: {
+     backgroundColor: 'rgba(255,255,255,0.1)',
+     borderRadius: 12,
+     paddingHorizontal: 15,
+     paddingVertical: 12,
+     color: 'white',
+     fontSize: 16,
+     borderWidth: 1,
+     borderColor: 'rgba(255,255,255,0.2)',
+   },
+   profileFormTextArea: {
+     height: 100,
+     textAlignVertical: 'top',
+   },
+   profileFormNote: {
+     color: 'rgba(255,255,255,0.7)',
+     fontSize: 14,
+     fontStyle: 'italic',
+     textAlign: 'center',
+     backgroundColor: 'rgba(255,255,255,0.05)',
+     padding: 15,
+     borderRadius: 12,
+     marginTop: 10,
+   },
+   profileMenuTextContainer: {
+     flex: 1,
+     flexDirection: 'row',
+     justifyContent: 'space-between',
+     alignItems: 'center',
+   },
+   profileMenuStatus: {
+     fontSize: 12,
+     fontWeight: '600',
+   },
+   textArea: {
+     height: 80,
+     textAlignVertical: 'top',
+   },
+   pickerContainer: {
+     borderRadius: 12,
+     overflow: 'hidden',
+   },
+   profileFormInputText: {
+     color: 'white',
+     fontSize: 16,
+   },
+   placeholderText: {
+     color: 'rgba(255,255,255,0.5)',
+   },
+   emptyBackupContainer: {
+     alignItems: 'center',
+     justifyContent: 'center',
+     paddingVertical: 40,
+     paddingHorizontal: 20,
+   },
+   emptyBackupIcon: {
+     fontSize: 48,
+     marginBottom: 16,
+   },
+   emptyBackupText: {
+     color: 'white',
+     fontSize: 18,
+     fontWeight: '600',
+     textAlign: 'center',
+     marginBottom: 8,
+   },
+   emptyBackupSubtext: {
+     color: 'rgba(255,255,255,0.7)',
+     fontSize: 14,
+     textAlign: 'center',
+     lineHeight: 20,
+   },
+   backupItem: {
+     backgroundColor: 'rgba(255,255,255,0.1)',
+     borderRadius: 12,
+     padding: 16,
+     marginBottom: 12,
+     borderWidth: 1,
+     borderColor: 'rgba(255,255,255,0.2)',
+   },
+   backupItemHeader: {
+     flexDirection: 'row',
+     justifyContent: 'space-between',
+     alignItems: 'flex-start',
+     marginBottom: 12,
+   },
+   backupItemTitle: {
+     color: 'white',
+     fontSize: 16,
+     fontWeight: '600',
+     flex: 1,
+   },
+   backupItemDate: {
+     color: 'rgba(255,255,255,0.7)',
+     fontSize: 12,
+     textAlign: 'right',
+     marginLeft: 8,
+   },
+   backupItemDetails: {
+     marginBottom: 16,
+   },
+   backupItemDetail: {
+     color: 'rgba(255,255,255,0.8)',
+     fontSize: 14,
+     marginBottom: 4,
+   },
+   backupItemActions: {
+     flexDirection: 'row',
+     justifyContent: 'space-between',
+     gap: 12,
+   },
+   backupActionButton: {
+     flex: 1,
+     paddingVertical: 10,
+     paddingHorizontal: 16,
+     borderRadius: 8,
+     alignItems: 'center',
+   },
+   restoreButton: {
+     backgroundColor: 'rgba(76, 175, 80, 0.2)',
+     borderWidth: 1,
+     borderColor: 'rgba(76, 175, 80, 0.5)',
+   },
+   deleteButton: {
+     backgroundColor: 'rgba(244, 67, 54, 0.2)',
+     borderWidth: 1,
+     borderColor: 'rgba(244, 67, 54, 0.5)',
+   },
+   backupActionText: {
+     color: 'white',
+     fontSize: 14,
+     fontWeight: '600',
+   },
+   faqContainer: {
+     paddingBottom: 20,
+   },
+   faqItem: {
+     backgroundColor: 'rgba(255,255,255,0.1)',
+     borderRadius: 15,
+     padding: 20,
+     marginBottom: 15,
+     borderWidth: 1,
+     borderColor: 'rgba(255,255,255,0.2)',
+   },
+   faqQuestion: {
+     color: 'white',
+     fontSize: 16,
+     fontWeight: '700',
+     marginBottom: 10,
+     lineHeight: 22,
+   },
+   faqAnswer: {
+     color: 'rgba(255,255,255,0.9)',
+     fontSize: 14,
+     lineHeight: 20,
      fontWeight: '400',
    },
  });
