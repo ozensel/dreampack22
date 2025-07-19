@@ -44,6 +44,28 @@ class AuthService {
     }
   }
 
+  // Apple ile giriş
+  async signInWithApple(identityToken, nonce) {
+    try {
+      const { data, error } = await supabase.auth.signInWithIdToken({
+        provider: 'apple',
+        token: identityToken,
+        nonce,
+      });
+
+      if (error) throw error;
+
+      // Local storage'a kaydet
+      await AsyncStorage.setItem('userToken', data.session.access_token);
+      await AsyncStorage.setItem('isLoggedIn', 'true');
+      await AsyncStorage.setItem('userEmail', data.user.email || '');
+
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
   // Çıkış yap
   async signOut() {
     try {

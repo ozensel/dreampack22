@@ -1,8 +1,25 @@
 import { supabase } from '../config/supabase';
+import subscriptionService from './subscriptionService';
 
 // OpenRouter API konfigürasyonu
-const OPENROUTER_API_KEY = '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';
+const OPENROUTER_API_KEY = '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';
 const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
+
+// API bağlantısını test et
+const testAPIConnection = async () => {
+  try {
+    const response = await fetch(`${OPENROUTER_BASE_URL}/models`, {
+      headers: {
+        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    return response.ok;
+  } catch (error) {
+    console.log('API bağlantı testi başarısız:', error);
+    return false;
+  }
+};
 
 export const dreamService = {
   // Rüya kaydet
@@ -204,8 +221,34 @@ export const dreamService = {
   },
 
   // Ünlü kişinin perspektifinden rüya yorumla
-  async interpretDreamByFamousPerson(dreamText, famousPersonId, category = null) {
+  async interpretDreamByFamousPerson(dreamText, famousPersonId, category = null, userId = null) {
     try {
+      // Premium özellik kontrolü
+      if (userId) {
+        const featureCheck = await subscriptionService.canUseFeature(userId, 'famous_person_interpretations');
+        if (!featureCheck.success) {
+          throw new Error('Özellik kontrolü başarısız');
+        }
+        
+        if (!featureCheck.data.canUse) {
+          return {
+            success: false,
+            error: 'premium_required',
+            message: 'Ünlü kişi yorumları premium özelliğidir. Lütfen premium abonelik satın alın.'
+          };
+        }
+      }
+      
+      // Rate limit için başlangıç bekleme
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Önce API bağlantısını test et
+      const isAPIAvailable = await testAPIConnection();
+      if (!isAPIAvailable) {
+        console.log('API kullanılamıyor, fallback yoruma geçiliyor');
+        throw new Error('API bağlantısı başarısız');
+      }
+
       const famousPeople = this.getFamousPeople();
       const person = famousPeople.find(p => p.id === famousPersonId);
       
@@ -226,32 +269,70 @@ ${person.name} olarak, kendi tarzında ve yaklaşımında şu formatta yanıt ve
 
 Yanıtını Türkçe ver ve ${person.name}'in karakteristik üslubunu kullan. Samimi ve bilge bir ton benimse.`;
 
-      const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-          'Content-Type': 'application/json',
-          'HTTP-Referer': 'https://dreampack.app',
-          'X-Title': 'DreamPack - Ünlü Kişi Rüya Yorumlama'
-        },
-        body: JSON.stringify({
-          model: 'anthropic/claude-3.5-sonnet',
-          messages: [
-            {
-              role: 'user',
-              content: prompt
-            }
-          ],
-          max_tokens: 1200,
-          temperature: 0.8
-        })
-      });
+      let response;
+      let retryCount = 0;
+      const maxRetries = 3;
+
+      while (retryCount < maxRetries) {
+        try {
+          // Rate limit için bekleme
+          if (retryCount > 0) {
+            console.log(`Rate limit nedeniyle ${5000 * retryCount}ms bekleniyor...`);
+            await new Promise(resolve => setTimeout(resolve, 5000 * retryCount));
+          }
+          
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 saniye timeout
+
+          response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+              'Content-Type': 'application/json',
+              'HTTP-Referer': 'https://dreampack.app',
+              'X-Title': 'DreamPack - Ünlü Kişi Rüya Yorumlama'
+            },
+            body: JSON.stringify({
+              model: 'google/gemma-2-9b-it:free',
+              messages: [
+                {
+                  role: 'user',
+                  content: prompt
+                }
+              ],
+              max_tokens: 1200,
+              temperature: 0.8
+            }),
+            signal: controller.signal
+          });
+
+          clearTimeout(timeoutId);
+          break; // Başarılı olursa döngüden çık
+        } catch (networkError) {
+          retryCount++;
+          console.log(`Network hatası, deneme ${retryCount}/${maxRetries}:`, networkError.message);
+          
+          if (retryCount >= maxRetries) {
+            throw networkError; // Son deneme de başarısızsa hatayı fırlat
+          }
+          
+          // Retry öncesi daha uzun bekleme (rate limit için)
+          await new Promise(resolve => setTimeout(resolve, 5000 * retryCount));
+        }
+      }
 
       if (!response.ok) {
-        throw new Error(`OpenRouter API hatası: ${response.status}`);
+        const errorText = await response.text();
+        console.error('API Hatası:', response.status, errorText);
+        throw new Error(`OpenRouter API hatası: ${response.status} - ${errorText}`);
       }
 
       const result = await response.json();
+      
+      if (!result.choices || !result.choices[0] || !result.choices[0].message) {
+        throw new Error('API yanıtı beklenmeyen formatta');
+      }
+
       const interpretation = result.choices[0].message.content;
 
       // Yorumu parse et ve yapılandır
@@ -265,6 +346,23 @@ Yanıtını Türkçe ver ve ${person.name}'in karakteristik üslubunu kullan. Sa
         type: 'famous_person'
       };
 
+      // Başarılı yorumlama sonrası kullanım kaydı ekle
+      if (userId) {
+        await subscriptionService.addUsageRecord(userId, 'famous_person_interpretation', {
+          famousPersonId,
+          category,
+          dreamLength: dreamText.length
+        });
+      }
+      
+      // Başarılı yorumlama sonrası kullanım kaydı ekle
+      if (userId) {
+        await subscriptionService.addUsageRecord(userId, 'dream_interpretation', {
+          category,
+          dreamLength: dreamText.length
+        });
+      }
+      
       return { success: true, data: structuredInterpretation };
     } catch (error) {
       console.error('Ünlü kişi rüya yorumlama hatası:', error);
@@ -292,8 +390,35 @@ Yanıtını Türkçe ver ve ${person.name}'in karakteristik üslubunu kullan. Sa
   },
 
   // OpenRouter ile rüya yorumla (genel)
-  async interpretDream(dreamText, category = null) {
+  async interpretDream(dreamText, category = null, userId = null) {
     try {
+      // Kullanım limiti kontrolü
+      if (userId) {
+        const usageCheck = await subscriptionService.checkDailyUsageLimit(userId);
+        if (!usageCheck.success) {
+          throw new Error('Kullanım limiti kontrolü başarısız');
+        }
+        
+        if (!usageCheck.data.canUse) {
+          return {
+            success: false,
+            error: 'usage_limit_exceeded',
+            message: `Günlük rüya yorumlama limitiniz dolmuştur (${usageCheck.data.usedCount}/${usageCheck.data.limit}). ${usageCheck.data.isPremium ? 'Lütfen yarın tekrar deneyin.' : 'Premium abonelik ile sınırsız yorumlama yapabilirsiniz.'}`,
+            data: usageCheck.data
+          };
+        }
+      }
+      
+      // Rate limit için başlangıç bekleme
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Önce API bağlantısını test et
+      const isAPIAvailable = await testAPIConnection();
+      if (!isAPIAvailable) {
+        console.log('API kullanılamıyor, fallback yoruma geçiliyor');
+        throw new Error('API bağlantısı başarısız');
+      }
+
       const prompt = `Sen bir rüya yorumlama uzmanısın. Aşağıdaki rüyayı detaylı bir şekilde yorumla:
 
 Rüya: ${dreamText}
@@ -307,32 +432,70 @@ Lütfen şu formatta yanıt ver:
 
 Yanıtını Türkçe ver ve samimi, anlayışlı bir dil kullan.`;
 
-      const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-          'Content-Type': 'application/json',
-          'HTTP-Referer': 'https://dreampack.app',
-          'X-Title': 'DreamPack - Rüya Yorumlama'
-        },
-        body: JSON.stringify({
-          model: 'anthropic/claude-3.5-sonnet',
-          messages: [
-            {
-              role: 'user',
-              content: prompt
-            }
-          ],
-          max_tokens: 1000,
-          temperature: 0.7
-        })
-      });
+      let response;
+      let retryCount = 0;
+      const maxRetries = 3;
+
+      while (retryCount < maxRetries) {
+         try {
+           // Rate limit için bekleme
+           if (retryCount > 0) {
+             console.log(`Rate limit nedeniyle ${5000 * retryCount}ms bekleniyor...`);
+             await new Promise(resolve => setTimeout(resolve, 5000 * retryCount));
+           }
+           
+           const controller = new AbortController();
+           const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 saniye timeout
+
+          response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+              'Content-Type': 'application/json',
+              'HTTP-Referer': 'https://dreampack.app',
+              'X-Title': 'DreamPack - Rüya Yorumlama'
+            },
+            body: JSON.stringify({
+              model: 'google/gemma-2-9b-it:free',
+              messages: [
+                {
+                  role: 'user',
+                  content: prompt
+                }
+              ],
+              max_tokens: 1000,
+              temperature: 0.7
+            }),
+            signal: controller.signal
+          });
+
+          clearTimeout(timeoutId);
+          break; // Başarılı olursa döngüden çık
+        } catch (networkError) {
+          retryCount++;
+          console.log(`Network hatası, deneme ${retryCount}/${maxRetries}:`, networkError.message);
+          
+          if (retryCount >= maxRetries) {
+            throw networkError; // Son deneme de başarısızsa hatayı fırlat
+          }
+          
+          // Retry öncesi daha uzun bekleme (rate limit için)
+           await new Promise(resolve => setTimeout(resolve, 5000 * retryCount));
+        }
+      }
 
       if (!response.ok) {
-        throw new Error(`OpenRouter API hatası: ${response.status}`);
+        const errorText = await response.text();
+        console.error('API Hatası:', response.status, errorText);
+        throw new Error(`OpenRouter API hatası: ${response.status} - ${errorText}`);
       }
 
       const result = await response.json();
+      
+      if (!result.choices || !result.choices[0] || !result.choices[0].message) {
+        throw new Error('API yanıtı beklenmeyen formatta');
+      }
+
       const interpretation = result.choices[0].message.content;
 
       // Yorumu parse et ve yapılandır

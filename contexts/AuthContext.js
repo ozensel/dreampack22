@@ -40,12 +40,30 @@ export const AuthProvider = ({ children }) => {
 
   const getInitialSession = async () => {
     try {
+      // Önce AsyncStorage'dan çıkış durumunu kontrol et
+      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+      const isLoggedIn = await AsyncStorage.getItem('isLoggedIn');
+      
+      // Eğer kullanıcı çıkış yapmışsa session kontrolü yapma
+      if (isLoggedIn !== 'true') {
+        console.log('User logged out, clearing session');
+        setSession(null);
+        setUser(null);
+        // Supabase session'ını da temizle
+        await authService.signOut();
+        return;
+      }
+      
       const { session, error } = await authService.getSession();
       if (error) {
         console.log('Session error:', error);
         // Hatalı session durumunda temizle
         setSession(null);
         setUser(null);
+        // AsyncStorage'ı da temizle
+        await AsyncStorage.removeItem('isLoggedIn');
+        await AsyncStorage.removeItem('userToken');
+        await AsyncStorage.removeItem('userEmail');
       } else {
         setSession(session);
         setUser(session?.user ?? null);
@@ -73,24 +91,31 @@ export const AuthProvider = ({ children }) => {
     return result;
   };
 
+  const signInWithApple = async (identityToken, nonce) => {
+    const result = await authService.signInWithApple(identityToken, nonce);
+    return result;
+  };
+
   const signOut = async () => {
-    // Hemen local state'i temizle - hiçbir hata durumunda bekletme
-    setSession(null);
-    setUser(null);
-    setLoading(false);
-    
-    // Arka planda sessizce Supabase ve AsyncStorage temizliği yap
-    setTimeout(async () => {
-      try {
-        await authService.signOut();
-      } catch (error) {
-        // Sessizce ignore et
-        console.log('Background signOut completed with error (ignored):', error);
-      }
-    }, 0);
-    
-    // Anında başarılı sonuç döndür
-    return { success: true };
+    try {
+      // Önce authService ile temizlik yap
+      await authService.signOut();
+      
+      // Sonra local state'i temizle
+      setSession(null);
+      setUser(null);
+      setLoading(false);
+      
+      console.log('User successfully signed out');
+      return { success: true };
+    } catch (error) {
+      console.log('SignOut error:', error);
+      // Hata olsa bile local state'i temizle
+      setSession(null);
+      setUser(null);
+      setLoading(false);
+      return { success: true };
+    }
   };
 
   const resetPassword = async (email) => {
@@ -105,6 +130,7 @@ export const AuthProvider = ({ children }) => {
     loading,
     signIn,
     signUp,
+    signInWithApple,
     signOut,
     resetPassword,
   };

@@ -28,6 +28,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { dreamService } from '../services/dreamService';
 import { supabase } from '../config/supabase';
+import PremiumFeatureGate from '../components/PremiumFeatureGate';
+import subscriptionService from '../services/subscriptionService';
 import notificationService from '../services/notificationService';
 import { wp, hp, RFValue, spacing, fontSize, borderRadius, iconSize, isSmallDevice, isLargeDevice } from '../utils/responsive';
 
@@ -62,6 +64,8 @@ export default function DreamInterpretationScreen({ navigation }) {
     newPassword: '',
     confirmPassword: ''
   });
+  const [showPremiumGate, setShowPremiumGate] = useState(false);
+  const [premiumFeatureName, setPremiumFeatureName] = useState('');
   const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState(true);
   const [darkModeEnabled, setDarkModeEnabled] = useState(false);
   const [dataRequestModalVisible, setDataRequestModalVisible] = useState(false);
@@ -75,6 +79,7 @@ export default function DreamInterpretationScreen({ navigation }) {
   });
   const [backupHistoryModalVisible, setBackupHistoryModalVisible] = useState(false);
   const [backupHistory, setBackupHistory] = useState([]);
+  const [userSubscription, setUserSubscription] = useState(null);
   
   const { user, signOut } = useAuth();
   const { t, currentLanguage, changeLanguage } = useLanguage();
@@ -118,11 +123,69 @@ export default function DreamInterpretationScreen({ navigation }) {
 
     loadUserData();
     loadFamousPeople();
+    loadUserSubscription();
   }, []);
 
   const loadFamousPeople = () => {
     const people = dreamService.getFamousPeople();
     setFamousPeople(people);
+  };
+
+  const loadUserSubscription = async () => {
+    console.log('DreamInterpretationScreen - Loading subscription for user:', user?.id);
+    if (user?.id) {
+      try {
+        const result = await subscriptionService.getUserActiveSubscription(user.id);
+        console.log('DreamInterpretationScreen - Subscription result:', result);
+        if (result.success) {
+          setUserSubscription(result.data);
+          console.log('DreamInterpretationScreen - User subscription set:', result.data);
+        } else {
+          console.log('DreamInterpretationScreen - No active subscription found');
+          setUserSubscription(null);
+        }
+      } catch (error) {
+        console.error('DreamInterpretationScreen - Abonelik bilgisi yüklenirken hata:', error);
+        setUserSubscription(null);
+      }
+    } else {
+      console.log('DreamInterpretationScreen - No user ID available');
+      setUserSubscription(null);
+    }
+  };
+
+  const handlePremiumFeatureAccess = (featureName) => {
+    setPremiumFeatureName(featureName);
+    setShowPremiumGate(true);
+  };
+
+  const handleUpgradePress = () => {
+    setShowPremiumGate(false);
+    navigation.navigate('SubscriptionPlans');
+  };
+
+  const checkPremiumAccess = async (feature) => {
+    if (!user?.id) return false;
+    
+    try {
+      const result = await subscriptionService.canUseFeature(user.id, feature);
+      return result.success && result.data.canUse;
+    } catch (error) {
+      console.error('Premium erişim kontrolü hatası:', error);
+      return false;
+    }
+  };
+
+  const checkUsageLimit = async () => {
+    if (!user?.id) return { canUse: true };
+    
+    try {
+      const result = await subscriptionService.checkDailyUsageLimit(user.id);
+      return result.success ? result.data : { canUse: true };
+    } catch (error) {
+      console.error('Kullanım limiti kontrolü hatası:', error);
+      return { canUse: true };
+    }
   };
 
   const loadUserData = async () => {
@@ -202,6 +265,32 @@ export default function DreamInterpretationScreen({ navigation }) {
       return;
     }
 
+    // Kullanım limiti kontrolü
+    const usageCheck = await checkUsageLimit();
+    if (!usageCheck.canUse) {
+      Alert.alert(
+        'Kullanım Limiti',
+        `Günlük rüya yorumlama limitiniz dolmuştur (${usageCheck.usedCount}/${usageCheck.limit}). ${usageCheck.isPremium ? 'Lütfen yarın tekrar deneyin.' : 'Premium abonelik ile sınırsız yorumlama yapabilirsiniz.'}`,
+        [
+          { text: 'Tamam', style: 'cancel' },
+          ...(usageCheck.isPremium ? [] : [{
+            text: 'Premium\'a Geç',
+            onPress: () => navigation.navigate('SubscriptionPlans')
+          }])
+        ]
+      );
+      return;
+    }
+
+    // Ünlü kişi yorumu için premium kontrolü
+    if (selectedFamousPerson) {
+      const hasAccess = await checkPremiumAccess('famous_person_interpretations');
+      if (!hasAccess) {
+        handlePremiumFeatureAccess('Ünlü Kişi Yorumları');
+        return;
+      }
+    }
+
     setIsLoading(true);
     
     try {
@@ -220,11 +309,12 @@ export default function DreamInterpretationScreen({ navigation }) {
           interpretResult = await dreamService.interpretDreamByFamousPerson(
             dreamText, 
             selectedFamousPerson, 
-            selectedCategory
+            selectedCategory,
+            user?.id
           );
         } else {
           // Normal yorumlama
-          interpretResult = await dreamService.interpretDream(dreamText, selectedCategory);
+          interpretResult = await dreamService.interpretDream(dreamText, selectedCategory, user?.id);
         }
         
         if (interpretResult.success) {
@@ -242,6 +332,22 @@ export default function DreamInterpretationScreen({ navigation }) {
           setSelectedCategory('');
           setSelectedFamousPerson('');
           loadUserData();
+        } else if (interpretResult.error === 'premium_required') {
+          handlePremiumFeatureAccess('Ünlü Kişi Yorumları');
+        } else if (interpretResult.error === 'usage_limit_exceeded') {
+          Alert.alert(
+            'Kullanım Limiti',
+            interpretResult.message,
+            [
+              { text: 'Tamam', style: 'cancel' },
+              ...(interpretResult.data?.isPremium ? [] : [{
+                text: 'Premium\'a Geç',
+                onPress: () => navigation.navigate('SubscriptionPlans')
+              }])
+            ]
+          );
+        } else {
+          Alert.alert('Hata', interpretResult.error || 'Rüya yorumlanırken bir hata oluştu.');
         }
       } else {
         Alert.alert('Hata', 'Rüya kaydedilemedi.');
@@ -796,6 +902,50 @@ Bu talep DreamPack uygulaması üzerinden gönderilmiştir.`;
       showsVerticalScrollIndicator={false}
       contentContainerStyle={styles.scrollContent}
     >
+      {/* Premium Status Indicator */}
+      <Animated.View style={[styles.premiumStatusSection, { opacity: fadeAnim }]}>
+        {userSubscription ? (
+          <BlurView intensity={Platform.OS === 'android' ? 40 : 20} style={styles.premiumStatusBlur}>
+            <LinearGradient
+              colors={['rgba(255, 215, 0, 0.9)', 'rgba(255, 165, 0, 0.9)']}
+              style={styles.premiumBadgeHome}
+            >
+              <Ionicons name="diamond" size={wp(5)} color="white" />
+              <Text style={styles.premiumTextHome}>Premium Üye</Text>
+              <View style={styles.premiumSparkle}>
+                <Ionicons name="sparkles" size={wp(3)} color="white" />
+              </View>
+            </LinearGradient>
+          </BlurView>
+        ) : (
+          <TouchableOpacity 
+            style={styles.upgradeContainer}
+            onPress={() => navigation.navigate('SubscriptionPlans')}
+            activeOpacity={0.8}
+          >
+            <BlurView intensity={Platform.OS === 'android' ? 40 : 20} style={styles.upgradeBlur}>
+              <LinearGradient
+                colors={['rgba(76, 175, 255, 0.9)', 'rgba(118, 75, 255, 0.9)']}
+                style={styles.upgradeBadgeHome}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <View style={styles.upgradeIconContainer}>
+                  <Ionicons name="rocket" size={wp(5)} color="white" />
+                </View>
+                <View style={styles.upgradeTextContainer}>
+                  <Text style={styles.upgradeMainText}>Premium'a Geç</Text>
+                  <Text style={styles.upgradeSubText}>Sınırsız rüya yorumu</Text>
+                </View>
+                <View style={styles.upgradeArrow}>
+                  <Ionicons name="chevron-forward" size={wp(4)} color="white" />
+                </View>
+              </LinearGradient>
+            </BlurView>
+          </TouchableOpacity>
+        )}
+      </Animated.View>
+
       {/* Quick Stats */}
       <Animated.View style={[styles.statsContainer, { opacity: fadeAnim }]}>
         <BlurView intensity={Platform.OS === 'android' ? 40 : 20} style={styles.statsBlur}>
@@ -1216,6 +1366,117 @@ Bu talep DreamPack uygulaması üzerinden gönderilmiştir.`;
                 </View>
                 <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.5)" />
               </TouchableOpacity>
+            </View>
+
+            {/* Subscription Status Card */}
+            <View style={styles.modernMenuCard}>
+              <View style={styles.modernSectionHeader}>
+                <Ionicons name="diamond-outline" size={18} color="white" />
+                <Text style={styles.modernSectionTitle}>Abonelik Durumu</Text>
+              </View>
+              
+              <View style={styles.subscriptionStatusContainer}>
+                {userSubscription ? (
+                  <View style={styles.premiumStatusCard}>
+                    <LinearGradient
+                      colors={['#FFD700', '#FFA500']}
+                      style={styles.premiumStatusGradient}
+                    >
+                      <View style={styles.premiumStatusContent}>
+                        <View style={styles.premiumStatusLeft}>
+                          <Ionicons name="diamond" size={wp(6)} color="white" />
+                          <View style={styles.premiumStatusText}>
+                            <Text style={styles.premiumStatusTitle}>Premium Üye</Text>
+                            <Text style={styles.premiumStatusSubtitle}>
+                              {new Date(userSubscription.expires_at).toLocaleDateString('tr-TR')} tarihine kadar
+                            </Text>
+                          </View>
+                        </View>
+                        <TouchableOpacity 
+                          style={styles.manageSubscriptionButton}
+                          onPress={() => navigation.navigate('SubscriptionPlans')}
+                        >
+                          <Text style={styles.manageSubscriptionText}>Yönet</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </LinearGradient>
+                  </View>
+                ) : (
+                  <View style={styles.freeStatusCard}>
+                    <View style={styles.freeStatusContent}>
+                      <View style={styles.freeStatusLeft}>
+                        <Ionicons name="gift-outline" size={wp(6)} color="#4facfe" />
+                        <View style={styles.freeStatusText}>
+                          <Text style={styles.freeStatusTitle}>Ücretsiz Plan</Text>
+                          <Text style={styles.freeStatusSubtitle}>Günde 3 rüya yorumlama hakkınız var</Text>
+                        </View>
+                      </View>
+                      <TouchableOpacity 
+                        style={styles.upgradeButton}
+                        onPress={() => navigation.navigate('SubscriptionPlans')}
+                      >
+                        <LinearGradient
+                          colors={['#4facfe', '#00f2fe']}
+                          style={styles.upgradeButtonGradient}
+                        >
+                          <Text style={styles.upgradeButtonText}>Yükselt</Text>
+                        </LinearGradient>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
+              </View>
+              
+              {/* Usage Rights */}
+              <View style={styles.usageRightsContainer}>
+                <Text style={styles.usageRightsTitle}>Kullanım Hakları</Text>
+                <View style={styles.usageRightsList}>
+                  <View style={styles.usageRightItem}>
+                    <Ionicons 
+                      name={userSubscription ? "checkmark-circle" : "close-circle"} 
+                      size={wp(4)} 
+                      color={userSubscription ? "#4CAF50" : "#FF5722"} 
+                    />
+                    <Text style={styles.usageRightText}>
+                      {userSubscription ? "Sınırsız rüya yorumlama" : "Günde 3 rüya yorumlama"}
+                    </Text>
+                  </View>
+                  <View style={styles.usageRightItem}>
+                    <Ionicons 
+                      name={userSubscription ? "checkmark-circle" : "close-circle"} 
+                      size={wp(4)} 
+                      color={userSubscription ? "#4CAF50" : "#FF5722"} 
+                    />
+                    <Text style={styles.usageRightText}>
+                      {userSubscription ? "Ünlü kişi yorumları" : "Ünlü kişi yorumları (Premium)"}
+                    </Text>
+                  </View>
+                  <View style={styles.usageRightItem}>
+                    <Ionicons 
+                      name={userSubscription ? "checkmark-circle" : "close-circle"} 
+                      size={wp(4)} 
+                      color={userSubscription ? "#4CAF50" : "#FF5722"} 
+                    />
+                    <Text style={styles.usageRightText}>
+                      {userSubscription ? "Gelişmiş istatistikler" : "Temel istatistikler"}
+                    </Text>
+                  </View>
+                  <View style={styles.usageRightItem}>
+                    <Ionicons 
+                      name={userSubscription ? "checkmark-circle" : "close-circle"} 
+                      size={wp(4)} 
+                      color={userSubscription ? "#4CAF50" : "#FF5722"} 
+                    />
+                    <Text style={styles.usageRightText}>
+                      {userSubscription ? "Öncelikli destek" : "Standart destek"}
+                    </Text>
+                  </View>
+                  <View style={styles.usageRightItem}>
+                    <Ionicons name="checkmark-circle" size={wp(4)} color="#4CAF50" />
+                    <Text style={styles.usageRightText}>Reklamsız deneyim</Text>
+                  </View>
+                </View>
+              </View>
             </View>
 
             {/* Notification Settings Card */}
@@ -2182,14 +2443,21 @@ Bu talep DreamPack uygulaması üzerinden gönderilmiştir.`;
         </LinearGradient>
       </Modal>
 
+      {/* Premium Feature Gate Modal */}
+      <PremiumFeatureGate
+        visible={showPremiumGate}
+        featureName={premiumFeatureName}
+        onClose={() => setShowPremiumGate(false)}
+        onUpgrade={handleUpgradePress}
+      />
+
     </LinearGradient>
   );
 }
 
-const getStyles = (darkMode) => StyleSheet.create({
+const getStyles = (darkModeEnabled) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: darkMode ? '#1a1a2e' : 'transparent',
   },
   floatingElements: {
     position: 'absolute',
@@ -2217,14 +2485,14 @@ const getStyles = (darkMode) => StyleSheet.create({
   },
   welcomeText: {
     fontSize: RFValue(16),
-    color: darkMode ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.8)',
+    color: darkModeEnabled ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.8)',
     fontWeight: '500',
   },
   userName: {
     fontSize: RFValue(24),
-    color: darkMode ? 'white' : 'white',
+    color: darkModeEnabled ? 'white' : 'white',
     fontWeight: 'bold',
-    textShadowColor: darkMode ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.3)',
+    textShadowColor: darkModeEnabled ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.3)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
   },
@@ -2256,6 +2524,7 @@ const getStyles = (darkMode) => StyleSheet.create({
   statsBlur: {
     borderRadius: 20,
     overflow: 'hidden',
+    backgroundColor: Platform.OS === 'android' ? (darkModeEnabled ? 'rgba(26,26,46,0.8)' : 'rgba(102,126,234,0.3)') : 'transparent',
   },
   statsContent: {
     flexDirection: 'row',
@@ -2287,6 +2556,7 @@ const getStyles = (darkMode) => StyleSheet.create({
   sectionBlur: {
     borderRadius: 20,
     overflow: 'hidden',
+    backgroundColor: Platform.OS === 'android' ? (darkModeEnabled ? 'rgba(26,26,46,0.8)' : 'rgba(102,126,234,0.3)') : 'transparent',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -2312,27 +2582,27 @@ const getStyles = (darkMode) => StyleSheet.create({
     marginBottom: 20,
   },
   dreamInputWrapper: {
-    backgroundColor: darkMode ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.1)',
+    backgroundColor: darkModeEnabled ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.1)',
     borderRadius: 15,
     borderWidth: 1,
-    borderColor: darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.2)',
+    borderColor: darkModeEnabled ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.2)',
     minHeight: 100,
   },
   inputWrapperFocused: {
-    borderColor: darkMode ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.5)',
-    backgroundColor: darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.15)',
+    borderColor: darkModeEnabled ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.5)',
+    backgroundColor: darkModeEnabled ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.15)',
   },
   dreamInput: {
     paddingHorizontal: 15,
     paddingVertical: 15,
     fontSize: 16,
-    color: darkMode ? '#ffffff' : 'white',
+    color: darkModeEnabled ? '#ffffff' : 'white',
     textAlignVertical: 'top',
   },
   categoryTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: darkMode ? '#ffffff' : 'white',
+    color: darkModeEnabled ? '#ffffff' : 'white',
     marginBottom: 10,
   },
   categoriesContainer: {
@@ -3080,7 +3350,7 @@ const getStyles = (darkMode) => StyleSheet.create({
      padding: wp(6),
      backgroundColor: 'rgba(255,255,255,0.08)',
      borderRadius: wp(5),
-     marginHorizontal: wp(5),
+     marginHorizontal: wp(2),
      marginBottom: hp(2.5),
      borderWidth: 1,
      borderColor: 'rgba(255,255,255,0.15)',
@@ -3245,7 +3515,7 @@ const getStyles = (darkMode) => StyleSheet.create({
    modernMenuCard: {
      backgroundColor: 'rgba(255,255,255,0.1)',
      borderRadius: 20,
-     marginHorizontal: 20,
+     marginHorizontal: 10,
      marginBottom: 20,
      borderWidth: 1,
      borderColor: 'rgba(255,255,255,0.2)',
@@ -3337,7 +3607,7 @@ const getStyles = (darkMode) => StyleSheet.create({
      fontWeight: '500',
    },
    modernLogoutButton: {
-     marginHorizontal: 20,
+     marginHorizontal: 10,
      marginBottom: 30,
      borderRadius: 15,
      overflow: 'hidden',
@@ -3605,7 +3875,7 @@ const getStyles = (darkMode) => StyleSheet.create({
    enhancedProfileHeader: {
      marginTop: hp(2),
      marginBottom: hp(3),
-     marginHorizontal: wp(5),
+     marginHorizontal: wp(2),
      borderRadius: wp(6),
      overflow: 'hidden',
      elevation: 8,
@@ -3701,7 +3971,7 @@ const getStyles = (darkMode) => StyleSheet.create({
    },
    // Enhanced Stats Styles
    enhancedStatsContainer: {
-     marginHorizontal: wp(5),
+     marginHorizontal: wp(2),
      marginBottom: hp(3),
    },
    enhancedStatsGrid: {
@@ -3767,6 +4037,7 @@ const getStyles = (darkMode) => StyleSheet.create({
    tabBarBlur: {
      flex: 1,
      borderRadius: wp(8),
+     backgroundColor: Platform.OS === 'android' ? (darkModeEnabled ? 'rgba(26,26,46,0.8)' : 'rgba(102,126,234,0.3)') : 'transparent',
    },
    tabBarGradient: {
      flex: 1,
@@ -3808,8 +4079,198 @@ const getStyles = (darkMode) => StyleSheet.create({
      justifyContent: 'center',
      alignItems: 'center',
      backgroundColor: 'rgba(255,255,255,0.1)',
- 
+   },
+   // Subscription Status Styles
+   subscriptionStatusContainer: {
+     marginBottom: hp(2),
+   },
+   premiumStatusCard: {
+     borderRadius: wp(4),
+     overflow: 'hidden',
+     marginBottom: hp(2),
+   },
+   premiumStatusGradient: {
+     padding: wp(4),
+   },
+   premiumStatusContent: {
+     flexDirection: 'row',
+     alignItems: 'center',
+     justifyContent: 'space-between',
+   },
+   premiumStatusLeft: {
+     flexDirection: 'row',
+     alignItems: 'center',
+     flex: 1,
+   },
+   premiumStatusText: {
+     marginLeft: wp(3),
+     flex: 1,
+   },
+   premiumStatusTitle: {
+     fontSize: RFValue(16),
+     fontWeight: 'bold',
+     color: 'white',
+   },
+   premiumStatusSubtitle: {
+     fontSize: RFValue(12),
+     color: 'rgba(255,255,255,0.8)',
+     marginTop: hp(0.5),
+   },
+   manageSubscriptionButton: {
+     backgroundColor: 'rgba(255,255,255,0.2)',
+     paddingHorizontal: wp(4),
+     paddingVertical: hp(1),
+     borderRadius: wp(3),
+   },
+   manageSubscriptionText: {
+     color: 'white',
+     fontSize: RFValue(12),
+     fontWeight: '600',
+   },
+   freeStatusCard: {
+     backgroundColor: 'rgba(255,255,255,0.05)',
+     borderRadius: wp(4),
+     padding: wp(4),
+     borderWidth: 1,
+     borderColor: 'rgba(79, 172, 254, 0.3)',
+     marginBottom: hp(2),
+   },
+   freeStatusContent: {
+     flexDirection: 'row',
+     alignItems: 'center',
+     justifyContent: 'space-between',
+   },
+   freeStatusLeft: {
+     flexDirection: 'row',
+     alignItems: 'center',
+     flex: 1,
+   },
+   freeStatusText: {
+     marginLeft: wp(3),
+     flex: 1,
+   },
+   freeStatusTitle: {
+     fontSize: RFValue(16),
+     fontWeight: 'bold',
+     color: 'white',
+   },
+   freeStatusSubtitle: {
+     fontSize: RFValue(12),
+     color: 'rgba(255,255,255,0.7)',
+     marginTop: hp(0.5),
+   },
+   upgradeButton: {
+     borderRadius: wp(3),
+     overflow: 'hidden',
+   },
+   upgradeButtonGradient: {
+     paddingHorizontal: wp(4),
+     paddingVertical: hp(1),
+   },
+   upgradeButtonText: {
+     color: 'white',
+     fontSize: RFValue(12),
+     fontWeight: '600',
+   },
+   usageRightsContainer: {
+     marginTop: hp(1),
+   },
+   usageRightsTitle: {
+     fontSize: RFValue(14),
+     fontWeight: 'bold',
+     color: 'white',
+     marginBottom: hp(1.5),
+   },
+   usageRightsList: {
+     gap: hp(1),
+   },
+   usageRightItem: {
+     flexDirection: 'row',
+     alignItems: 'center',
+   },
+   // Premium Status Styles for Home Tab
+   premiumStatusSection: {
+     marginBottom: hp(2),
+   },
+   premiumStatusBlur: {
+     borderRadius: wp(5),
+     overflow: 'hidden',
+     shadowColor: '#FFD700',
+     shadowOffset: { width: 0, height: 8 },
+     shadowOpacity: 0.3,
+     shadowRadius: 16,
+     elevation: 8,
+   },
+   premiumBadgeHome: {
+     flexDirection: 'row',
+     alignItems: 'center',
+     justifyContent: 'center',
+     paddingHorizontal: wp(6),
+     paddingVertical: hp(1.5),
+     borderRadius: wp(5),
+     position: 'relative',
+   },
+   premiumTextHome: {
+     color: 'white',
+     fontSize: RFValue(16),
+     fontWeight: '700',
+     marginLeft: wp(2),
+   },
+   premiumSparkle: {
+     position: 'absolute',
+     top: hp(0.5),
+     right: wp(3),
+   },
+   upgradeContainer: {
+     shadowColor: '#4C7FFF',
+     shadowOffset: { width: 0, height: 8 },
+     shadowOpacity: 0.3,
+     shadowRadius: 16,
+     elevation: 8,
+   },
+   upgradeBlur: {
+     borderRadius: wp(5),
+     overflow: 'hidden',
+   },
+   upgradeBadgeHome: {
+     flexDirection: 'row',
+     alignItems: 'center',
+     paddingHorizontal: wp(5),
+     paddingVertical: hp(2),
+     borderRadius: wp(5),
+   },
+   upgradeIconContainer: {
+     width: wp(10),
+     height: wp(10),
+     borderRadius: wp(5),
+     backgroundColor: 'rgba(255, 255, 255, 0.2)',
+     alignItems: 'center',
+     justifyContent: 'center',
+     marginRight: wp(3),
+   },
+   upgradeTextContainer: {
+     flex: 1,
+   },
+   upgradeMainText: {
+     color: 'white',
+     fontSize: RFValue(16),
+     fontWeight: '700',
+   },
+   upgradeSubText: {
+     color: 'rgba(255, 255, 255, 0.8)',
+     fontSize: RFValue(12),
+     fontWeight: '500',
+     marginTop: hp(0.2),
+   },
+   upgradeArrow: {
+      marginLeft: wp(2),
     },
+   usageRightText: {
+     fontSize: RFValue(12),
+     color: 'rgba(255,255,255,0.8)',
+     marginLeft: wp(2),
+     flex: 1,
+   },
    tabIconContainerActive: {
      backgroundColor: 'rgba(255,255,255,0.25)',
      transform: [{ scale: 1.1 }],

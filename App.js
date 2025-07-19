@@ -10,6 +10,7 @@ import ForgotPasswordScreen from './screens/ForgotPasswordScreen';
 import HomeScreen from './screens/HomeScreen';
 import DreamInterpretationScreen from './screens/DreamInterpretationScreen';
 import NotificationSettingsScreen from './screens/NotificationSettingsScreen';
+import SubscriptionPlansScreen from './screens/SubscriptionPlansScreen';
 import { ActivityIndicator, View } from 'react-native';
 import notificationService from './services/notificationService';
 
@@ -41,6 +42,7 @@ function AppNavigator() {
             <Stack.Screen name="DreamInterpretation" component={DreamInterpretationScreen} />
             <Stack.Screen name="Home" component={HomeScreen} />
             <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
+            <Stack.Screen name="SubscriptionPlans" component={SubscriptionPlansScreen} />
           </>
         ) : (
           <>

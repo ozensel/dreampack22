@@ -7,6 +7,7 @@ import {
   ScrollView,
   Dimensions,
   StatusBar,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -15,6 +16,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { wp, hp, RFValue, spacing, fontSize, borderRadius, iconSize, isSmallDevice, isLargeDevice } from '../utils/responsive';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import UsageLimitIndicator from '../components/UsageLimitIndicator';
+import PremiumFeatureGate from '../components/PremiumFeatureGate';
+import subscriptionService from '../services/subscriptionService';
 
 const { width, height } = Dimensions.get('window');
 
@@ -23,11 +27,40 @@ export default function HomeScreen({ navigation }) {
   const [dreamCount, setDreamCount] = useState(0);
   const [recentDreams, setRecentDreams] = useState([]);
   const [greeting, setGreeting] = useState('');
+  const [showPremiumGate, setShowPremiumGate] = useState(false);
+  const [premiumFeatureName, setPremiumFeatureName] = useState('');
+  const [userSubscription, setUserSubscription] = useState(null);
 
   useEffect(() => {
+    console.log('HomeScreen useEffect triggered, user:', user?.id);
     loadDreamData();
     setGreetingMessage();
-  }, []);
+    loadUserSubscription();
+  }, [user]);
+
+  const loadUserSubscription = async () => {
+    if (user?.id) {
+      try {
+        console.log('Loading subscription for user:', user.id);
+        const result = await subscriptionService.getUserActiveSubscription(user.id);
+        console.log('Subscription result:', result);
+        if (result.success) {
+          setUserSubscription(result.data);
+          console.log('User subscription set:', result.data);
+        } else {
+          console.log('No active subscription found');
+          setUserSubscription(null);
+        }
+      } catch (error) {
+        console.error('Abonelik bilgisi yüklenirken hata:', error);
+        // Network hatası durumunda null olarak ayarla
+        setUserSubscription(null);
+      }
+    } else {
+      console.log('No user ID available for subscription check');
+      setUserSubscription(null);
+    }
+  };
 
   const loadDreamData = async () => {
     try {
@@ -50,6 +83,32 @@ export default function HomeScreen({ navigation }) {
       setGreeting('İyi Öğleden Sonra');
     } else {
       setGreeting('İyi Akşamlar');
+    }
+  };
+
+  const handlePremiumFeatureAccess = (featureName) => {
+    setPremiumFeatureName(featureName);
+    setShowPremiumGate(true);
+  };
+
+  const handleSubscriptionPress = () => {
+    navigation.navigate('SubscriptionPlans');
+  };
+
+  const handleUpgradePress = () => {
+    setShowPremiumGate(false);
+    navigation.navigate('SubscriptionPlans');
+  };
+
+  const checkPremiumAccess = async (feature) => {
+    if (!user?.id) return false;
+    
+    try {
+      const result = await subscriptionService.canUseFeature(user.id, feature);
+      return result.success && result.data.canUse;
+    } catch (error) {
+      console.error('Premium erişim kontrolü hatası:', error);
+      return false;
     }
   };
 
@@ -80,6 +139,22 @@ export default function HomeScreen({ navigation }) {
     },
     {
       id: 4,
+      title: 'Ünlü Yorumları',
+      subtitle: 'Premium özellik',
+      icon: 'diamond',
+      colors: ['#FFD700', '#FFA500'],
+      isPremium: true,
+      onPress: async () => {
+        const hasAccess = await checkPremiumAccess('famous_person_interpretations');
+        if (hasAccess) {
+          navigation.navigate('FamousPersonInterpretation');
+        } else {
+          handlePremiumFeatureAccess('Ünlü Kişi Yorumları');
+        }
+      }
+    },
+    {
+      id: 5,
       title: 'Profil',
       subtitle: 'Hesap ayarlarını düzenle',
       icon: 'person-circle',
@@ -107,14 +182,47 @@ export default function HomeScreen({ navigation }) {
               <Text style={styles.welcomeText}>
                 {user?.email?.split('@')[0] || 'Rüya Gezgini'}
               </Text>
+              {/* Premium Status Indicator */}
+              <View style={styles.premiumStatusContainer}>
+                {userSubscription ? (
+                  <View style={styles.premiumBadge}>
+                    <Ionicons name="diamond" size={wp(4)} color="#FFD700" />
+                    <Text style={styles.premiumText}>Premium Üye</Text>
+                  </View>
+                ) : (
+                  <TouchableOpacity 
+                    style={styles.upgradeBadge}
+                    onPress={() => navigation.navigate('SubscriptionPlans')}
+                  >
+                    <Ionicons name="arrow-up-circle" size={wp(4)} color="#4facfe" />
+                    <Text style={styles.upgradeText}>Ücretsiz Plan</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
-            <TouchableOpacity 
-              style={styles.notificationButton}
-              onPress={() => {}}
-            >
-              <Ionicons name="notifications-outline" size={wp(6)} color="white" />
-            </TouchableOpacity>
+            <View style={styles.headerButtons}>
+              <TouchableOpacity 
+                style={styles.subscriptionButton}
+                onPress={handleSubscriptionPress}
+              >
+                <Ionicons name="card" size={wp(5)} color="white" />
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.notificationButton}
+                onPress={() => {}}
+              >
+                <Ionicons name="notifications-outline" size={wp(5)} color="white" />
+              </TouchableOpacity>
+            </View>
           </View>
+
+          {/* Usage Limit Indicator */}
+          {user?.id && (
+            <UsageLimitIndicator 
+              userId={user.id} 
+              onUpgradePress={handleUpgradePress}
+            />
+          )}
 
           {/* Stats Overview */}
           <View style={styles.statsContainer}>
@@ -150,22 +258,29 @@ export default function HomeScreen({ navigation }) {
           
           <View style={styles.modernActionsContainer}>
             <TouchableOpacity 
-              style={[styles.modernActionCard, styles.primaryAction]}
+              style={[styles.modernActionCard]}
               onPress={() => navigation.navigate('DreamInterpretation')}
               activeOpacity={0.9}
             >
-              <View style={styles.modernActionContent}>
-                <View style={styles.modernActionLeft}>
-                  <View style={styles.modernActionIcon}>
-                    <Ionicons name="add-circle" size={wp(10)} color="white" />
+              <LinearGradient
+                colors={['#667eea', '#764ba2']}
+                style={styles.primaryActionGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <View style={styles.modernActionContent}>
+                  <View style={styles.modernActionLeft}>
+                    <View style={styles.modernActionIcon}>
+                      <Ionicons name="add-circle" size={wp(10)} color="white" />
+                    </View>
+                    <View style={styles.modernActionText}>
+                      <Text style={styles.modernActionTitle}>Rüya Ekle</Text>
+                      <Text style={styles.modernActionSubtitle}>Yeni rüyanı kaydet ve yorumla</Text>
+                    </View>
                   </View>
-                  <View style={styles.modernActionText}>
-                    <Text style={styles.modernActionTitle}>Rüya Ekle</Text>
-                    <Text style={styles.modernActionSubtitle}>Yeni rüyanı kaydet ve yorumla</Text>
-                  </View>
+                  <Ionicons name="chevron-forward" size={wp(6)} color="rgba(255,255,255,0.7)" />
                 </View>
-                <Ionicons name="chevron-forward" size={wp(6)} color="rgba(255,255,255,0.7)" />
-              </View>
+              </LinearGradient>
             </TouchableOpacity>
             
             <View style={styles.secondaryActionsRow}>
@@ -243,6 +358,15 @@ export default function HomeScreen({ navigation }) {
           <View style={styles.bottomSpacing} />
         </ScrollView>
       </LinearGradient>
+      
+      {/* Premium Feature Gate Modal */}
+      <PremiumFeatureGate
+        visible={showPremiumGate}
+        onClose={() => setShowPremiumGate(false)}
+        onUpgrade={handleUpgradePress}
+        featureName={premiumFeatureName}
+        description="Bu özellik premium abonelik gerektirir"
+      />
     </View>
   );
 }
@@ -259,7 +383,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: hp(12),
+    paddingBottom: Platform.OS === 'android' ? hp(20) : hp(12),
   },
   header: {
     flexDirection: 'row',
@@ -366,9 +490,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.27,
     shadowRadius: 4.65,
   },
-  primaryAction: {
-    backgroundColor: '#2d3436',
+  primaryActionGradient: {
     padding: wp(5),
+    borderRadius: wp(4),
   },
   modernActionContent: {
     flexDirection: 'row',
@@ -465,6 +589,51 @@ const styles = StyleSheet.create({
     paddingHorizontal: wp(2),
     paddingVertical: wp(1),
   },
+  premiumStatusContainer: {
+    marginTop: hp(1),
+  },
+  premiumBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 215, 0, 0.2)',
+    borderRadius: wp(4),
+    paddingHorizontal: wp(3),
+    paddingVertical: wp(1.5),
+    borderWidth: 1,
+    borderColor: '#FFD700',
+  },
+  premiumText: {
+    color: '#FFD700',
+    fontSize: RFValue(12),
+    fontWeight: '600',
+    marginLeft: wp(1.5),
+  },
+  upgradeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(79, 172, 254, 0.2)',
+    borderRadius: wp(4),
+    paddingHorizontal: wp(3),
+    paddingVertical: wp(1.5),
+    borderWidth: 1,
+    borderColor: '#4facfe',
+  },
+  upgradeText: {
+    color: '#4facfe',
+    fontSize: RFValue(12),
+    fontWeight: '600',
+    marginLeft: wp(1.5),
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  subscriptionButton: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: wp(6),
+    padding: wp(2.5),
+    marginRight: wp(2),
+  },
   dreamTypeText: {
     fontSize: RFValue(10),
     color: 'white',
@@ -487,6 +656,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   bottomSpacing: {
-    height: hp(5),
+    height: Platform.OS === 'android' ? hp(10) : hp(5),
   },
 });

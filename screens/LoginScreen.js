@@ -38,7 +38,7 @@ export default function LoginScreen({ navigation }) {
   const [passwordError, setPasswordError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   
-  const { signIn } = useAuth();
+  const { signIn, signInWithApple } = useAuth();
   const { t } = useLanguage();
   
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -243,7 +243,14 @@ export default function LoginScreen({ navigation }) {
         });
         
         // Apple credential'ını Supabase ile kullan
-        Alert.alert('Başarılı', 'Apple ile giriş başarılı!');
+        const result = await signInWithApple(credential.identityToken, credential.nonce);
+        
+        if (result.success) {
+          Alert.alert('Başarılı', 'Apple ile giriş başarılı!');
+          navigation.replace('Home');
+        } else {
+          Alert.alert('Hata', result.error || 'Apple ile giriş yapılamadı.');
+        }
       } else {
         Alert.alert('Bilgi', 'Apple ile giriş sadece iOS cihazlarda kullanılabilir.');
       }
@@ -330,180 +337,357 @@ export default function LoginScreen({ navigation }) {
             },
           ]}
         >
-          <BlurView intensity={20} style={styles.formBlur}>
-            <View style={styles.form}>
-              {/* Email Input */}
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>{t('auth.email')}</Text>
-                <View style={[styles.inputWrapper, emailFocused && styles.inputWrapperFocused, emailError && styles.inputWrapperError]}>
-                  <TextInput
-                    style={styles.input}
-                    value={email}
-                    onChangeText={handleEmailChange}
-                    placeholder={t('auth.emailPlaceholder')}
-                    placeholderTextColor="rgba(255,255,255,0.6)"
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    onFocus={() => setEmailFocused(true)}
-                    onBlur={() => setEmailFocused(false)}
-                  />
+          {Platform.OS === 'android' ? (
+            <View style={[styles.formBlur, styles.androidFormBlur]}>
+              <View style={styles.form}>
+                {/* Email Input */}
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>{t('auth.email')}</Text>
+                  <View style={[styles.inputWrapper, emailFocused && styles.inputWrapperFocused, emailError && styles.inputWrapperError]}>
+                    <TextInput
+                      style={styles.input}
+                      value={email}
+                      onChangeText={handleEmailChange}
+                      placeholder={t('auth.emailPlaceholder')}
+                      placeholderTextColor="rgba(255,255,255,0.6)"
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      onFocus={() => setEmailFocused(true)}
+                      onBlur={() => setEmailFocused(false)}
+                    />
+                  </View>
+                  {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
                 </View>
-                {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
-              </View>
 
-              {/* Password Input */}
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>{t('auth.password')}</Text>
-                <View style={[styles.inputWrapper, passwordFocused && styles.inputWrapperFocused, passwordError && styles.inputWrapperError]}>
-                  <TextInput
-                    style={[styles.input, { flex: 1 }]}
-                    value={password}
-                    onChangeText={handlePasswordChange}
-                    placeholder={t('auth.passwordPlaceholder')}
-                    placeholderTextColor="rgba(255,255,255,0.6)"
-                    secureTextEntry={!showPassword}
-                    autoCapitalize="none"
-                    onFocus={() => setPasswordFocused(true)}
-                    onBlur={() => setPasswordFocused(false)}
-                  />
-                  <TouchableOpacity
-                    style={styles.eyeButton}
-                    onPress={() => setShowPassword(!showPassword)}
-                  >
-                    <Text style={styles.eyeIcon}>{showPassword ? '👁️' : '👁️‍🗨️'}</Text>
-                  </TouchableOpacity>
+                {/* Password Input */}
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>{t('auth.password')}</Text>
+                  <View style={[styles.inputWrapper, passwordFocused && styles.inputWrapperFocused, passwordError && styles.inputWrapperError]}>
+                    <TextInput
+                      style={[styles.input, { flex: 1 }]}
+                      value={password}
+                      onChangeText={handlePasswordChange}
+                      placeholder={t('auth.passwordPlaceholder')}
+                      placeholderTextColor="rgba(255,255,255,0.6)"
+                      secureTextEntry={!showPassword}
+                      autoCapitalize="none"
+                      onFocus={() => setPasswordFocused(true)}
+                      onBlur={() => setPasswordFocused(false)}
+                    />
+                    <TouchableOpacity
+                      style={styles.eyeButton}
+                      onPress={() => setShowPassword(!showPassword)}
+                    >
+                      <Text style={styles.eyeIcon}>{showPassword ? '👁️' : '👁️‍🗨️'}</Text>
+                    </TouchableOpacity>
+                  </View>
+                  {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
                 </View>
-                {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
-              </View>
 
-              {/* Forgot Password */}
-              <TouchableOpacity 
-                style={styles.forgotPassword}
-                onPress={handleForgotPassword}
-              >
-                <Text style={styles.forgotPasswordText}>{t('auth.forgotPassword')}</Text>
-              </TouchableOpacity>
-
-              {/* Login Button */}
-              <TouchableOpacity 
-                style={styles.loginButton}
-                onPress={handleLogin}
-                disabled={isLoading}
-                activeOpacity={0.8}
-              >
-                <LinearGradient
-                  colors={isLoading ? ['#9CA3AF', '#6B7280'] : ['rgba(255,255,255,0.9)', 'rgba(255,255,255,0.7)']}
-                  style={styles.loginButtonGradient}
-                >
-                  {isLoading ? (
-                    <View style={styles.loadingContainer}>
-                      <ActivityIndicator size="small" color="white" />
-                      <Text style={[styles.loginButtonText, styles.loginButtonTextDisabled, { marginLeft: 10 }]}>
-                        {t('auth.signingIn')}
-                      </Text>
-                    </View>
-                  ) : (
-                    <Text style={styles.loginButtonText}>
-                      {t('auth.signIn')}
-                    </Text>
-                  )}
-                </LinearGradient>
-              </TouchableOpacity>
-
-              {/* Divider */}
-              <View style={styles.dividerContainer}>
-                <View style={styles.dividerLine} />
-                <Text style={styles.dividerText}>veya</Text>
-                <View style={styles.dividerLine} />
-              </View>
-
-              {/* Social Login Buttons */}
-              <View style={styles.socialButtonsContainer}>
-                {/* Google Sign In */}
+                {/* Forgot Password */}
                 <TouchableOpacity 
-                  style={styles.socialButton}
-                  onPress={handleGoogleSignIn}
+                  style={styles.forgotPassword}
+                  onPress={handleForgotPassword}
+                >
+                  <Text style={styles.forgotPasswordText}>{t('auth.forgotPassword')}</Text>
+                </TouchableOpacity>
+
+                {/* Login Button */}
+                <TouchableOpacity 
+                  style={styles.loginButton}
+                  onPress={handleLogin}
                   disabled={isLoading}
                   activeOpacity={0.8}
                 >
                   <LinearGradient
-                    colors={['rgba(255,255,255,0.95)', 'rgba(255,255,255,0.85)']}
-                    style={styles.socialButtonGradient}
+                    colors={isLoading ? ['#9CA3AF', '#6B7280'] : ['rgba(255,255,255,0.9)', 'rgba(255,255,255,0.7)']}
+                    style={styles.loginButtonGradient}
                   >
-                    <View style={styles.socialButtonIcon}>
-                      <GoogleIcon size={20} />
-                    </View>
-                    <Text style={styles.socialButtonText}>Google ile Giriş</Text>
+                    {isLoading ? (
+                      <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="small" color="white" />
+                        <Text style={[styles.loginButtonText, styles.loginButtonTextDisabled, { marginLeft: 10 }]}>
+                          {t('auth.signingIn')}
+                        </Text>
+                      </View>
+                    ) : (
+                      <Text style={styles.loginButtonText}>
+                        {t('auth.signIn')}
+                      </Text>
+                    )}
                   </LinearGradient>
                 </TouchableOpacity>
 
-                {/* Apple Sign In - Only show on iOS */}
-                {Platform.OS === 'ios' && (
+                {/* Divider */}
+                <View style={styles.dividerContainer}>
+                  <View style={styles.dividerLine} />
+                  <Text style={styles.dividerText}>veya</Text>
+                  <View style={styles.dividerLine} />
+                </View>
+
+                {/* Social Login Buttons */}
+                <View style={styles.socialButtonsContainer}>
+                  {/* Google Sign In */}
                   <TouchableOpacity 
                     style={styles.socialButton}
-                    onPress={handleAppleSignIn}
+                    onPress={handleGoogleSignIn}
                     disabled={isLoading}
                     activeOpacity={0.8}
                   >
                     <LinearGradient
-                      colors={['rgba(0,0,0,0.9)', 'rgba(0,0,0,0.8)']}
+                      colors={['rgba(255,255,255,0.95)', 'rgba(255,255,255,0.85)']}
                       style={styles.socialButtonGradient}
                     >
                       <View style={styles.socialButtonIcon}>
-                        <AppleIcon size={20} color="white" />
+                        <GoogleIcon size={20} />
                       </View>
-                      <Text style={[styles.socialButtonText, { color: 'white' }]}>Apple ile Giriş</Text>
+                      <Text style={styles.socialButtonText}>Google ile Giriş</Text>
                     </LinearGradient>
                   </TouchableOpacity>
-                )}
 
-                {/* Facebook Sign In */}
+                  {/* Apple Sign In - Only show on iOS */}
+                  {Platform.OS === 'ios' && (
+                    <TouchableOpacity 
+                      style={styles.socialButton}
+                      onPress={handleAppleSignIn}
+                      disabled={isLoading}
+                      activeOpacity={0.8}
+                    >
+                      <LinearGradient
+                        colors={['rgba(0,0,0,0.9)', 'rgba(0,0,0,0.8)']}
+                        style={styles.socialButtonGradient}
+                      >
+                        <View style={styles.socialButtonIcon}>
+                          <AppleIcon size={20} color="white" />
+                        </View>
+                        <Text style={[styles.socialButtonText, { color: 'white' }]}>Apple ile Giriş</Text>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  )}
+
+                  {/* Facebook Sign In */}
+                  <TouchableOpacity 
+                    style={styles.socialButton}
+                    onPress={handleFacebookSignIn}
+                    disabled={isLoading}
+                    activeOpacity={0.8}
+                  >
+                    <LinearGradient
+                      colors={['#1877F2', '#166FE5']}
+                      style={styles.socialButtonGradient}
+                    >
+                      <View style={styles.socialButtonIcon}>
+                        <FacebookIcon size={20} color="white" />
+                      </View>
+                      <Text style={[styles.socialButtonText, { color: 'white' }]}>Facebook ile Giriş</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+
+                  {/* Instagram Sign In */}
+                   <TouchableOpacity 
+                     style={styles.socialButton}
+                     onPress={handleInstagramSignIn}
+                     disabled={isLoading}
+                     activeOpacity={0.8}
+                   >
+                    <LinearGradient
+                      colors={['#E4405F', '#C13584']}
+                      style={styles.socialButtonGradient}
+                    >
+                      <View style={styles.socialButtonIcon}>
+                        <InstagramIcon size={20} color="white" />
+                      </View>
+                      <Text style={[styles.socialButtonText, { color: 'white' }]}>Instagram ile Giriş</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Sign Up */}
+                <View style={styles.signupContainer}>
+                  <Text style={styles.signupText}>{t('auth.noAccount')} </Text>
+                  <TouchableOpacity onPress={handleSignUp}>
+                    <Text style={styles.signupLink}>{t('auth.signUp')}</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          ) : (
+            <BlurView intensity={80} style={styles.formBlur}>
+              <View style={styles.form}>
+                {/* Email Input */}
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>{t('auth.email')}</Text>
+                  <View style={[styles.inputWrapper, emailFocused && styles.inputWrapperFocused, emailError && styles.inputWrapperError]}>
+                    <TextInput
+                      style={styles.input}
+                      value={email}
+                      onChangeText={handleEmailChange}
+                      placeholder={t('auth.emailPlaceholder')}
+                      placeholderTextColor="rgba(255,255,255,0.6)"
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      onFocus={() => setEmailFocused(true)}
+                      onBlur={() => setEmailFocused(false)}
+                    />
+                  </View>
+                  {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
+                </View>
+
+                {/* Password Input */}
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>{t('auth.password')}</Text>
+                  <View style={[styles.inputWrapper, passwordFocused && styles.inputWrapperFocused, passwordError && styles.inputWrapperError]}>
+                    <TextInput
+                      style={[styles.input, { flex: 1 }]}
+                      value={password}
+                      onChangeText={handlePasswordChange}
+                      placeholder={t('auth.passwordPlaceholder')}
+                      placeholderTextColor="rgba(255,255,255,0.6)"
+                      secureTextEntry={!showPassword}
+                      autoCapitalize="none"
+                      onFocus={() => setPasswordFocused(true)}
+                      onBlur={() => setPasswordFocused(false)}
+                    />
+                    <TouchableOpacity
+                      style={styles.eyeButton}
+                      onPress={() => setShowPassword(!showPassword)}
+                    >
+                      <Text style={styles.eyeIcon}>{showPassword ? '👁️' : '👁️‍🗨️'}</Text>
+                    </TouchableOpacity>
+                  </View>
+                  {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
+                </View>
+
+                {/* Forgot Password */}
                 <TouchableOpacity 
-                  style={styles.socialButton}
-                  onPress={handleFacebookSignIn}
+                  style={styles.forgotPassword}
+                  onPress={handleForgotPassword}
+                >
+                  <Text style={styles.forgotPasswordText}>{t('auth.forgotPassword')}</Text>
+                </TouchableOpacity>
+
+                {/* Login Button */}
+                <TouchableOpacity 
+                  style={styles.loginButton}
+                  onPress={handleLogin}
                   disabled={isLoading}
                   activeOpacity={0.8}
                 >
                   <LinearGradient
-                    colors={['#1877F2', '#166FE5']}
-                    style={styles.socialButtonGradient}
+                    colors={isLoading ? ['#9CA3AF', '#6B7280'] : ['rgba(255,255,255,0.9)', 'rgba(255,255,255,0.7)']}
+                    style={styles.loginButtonGradient}
                   >
-                    <View style={styles.socialButtonIcon}>
-                      <FacebookIcon size={20} color="white" />
-                    </View>
-                    <Text style={[styles.socialButtonText, { color: 'white' }]}>Facebook ile Giriş</Text>
+                    {isLoading ? (
+                      <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="small" color="white" />
+                        <Text style={[styles.loginButtonText, styles.loginButtonTextDisabled, { marginLeft: 10 }]}>
+                          {t('auth.signingIn')}
+                        </Text>
+                      </View>
+                    ) : (
+                      <Text style={styles.loginButtonText}>
+                        {t('auth.signIn')}
+                      </Text>
+                    )}
                   </LinearGradient>
                 </TouchableOpacity>
 
-                {/* Instagram Sign In */}
-                 <TouchableOpacity 
-                   style={styles.socialButton}
-                   onPress={handleInstagramSignIn}
-                   disabled={isLoading}
-                   activeOpacity={0.8}
-                 >
-                  <LinearGradient
-                    colors={['#E4405F', '#C13584']}
-                    style={styles.socialButtonGradient}
-                  >
-                    <View style={styles.socialButtonIcon}>
-                      <InstagramIcon size={20} color="white" />
-                    </View>
-                    <Text style={[styles.socialButtonText, { color: 'white' }]}>Instagram ile Giriş</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              </View>
+                {/* Divider */}
+                <View style={styles.dividerContainer}>
+                  <View style={styles.dividerLine} />
+                  <Text style={styles.dividerText}>veya</Text>
+                  <View style={styles.dividerLine} />
+                </View>
 
-              {/* Sign Up */}
-              <View style={styles.signupContainer}>
-                <Text style={styles.signupText}>{t('auth.noAccount')} </Text>
-                <TouchableOpacity onPress={handleSignUp}>
-                  <Text style={styles.signupLink}>{t('auth.signUp')}</Text>
-                </TouchableOpacity>
+                {/* Social Login Buttons */}
+                <View style={styles.socialButtonsContainer}>
+                  {/* Google Sign In */}
+                  <TouchableOpacity 
+                    style={styles.socialButton}
+                    onPress={handleGoogleSignIn}
+                    disabled={isLoading}
+                    activeOpacity={0.8}
+                  >
+                    <LinearGradient
+                      colors={['rgba(255,255,255,0.95)', 'rgba(255,255,255,0.85)']}
+                      style={styles.socialButtonGradient}
+                    >
+                      <View style={styles.socialButtonIcon}>
+                        <GoogleIcon size={20} />
+                      </View>
+                      <Text style={styles.socialButtonText}>Google ile Giriş</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+
+                  {/* Apple Sign In - Only show on iOS */}
+                  {Platform.OS === 'ios' && (
+                    <TouchableOpacity 
+                      style={styles.socialButton}
+                      onPress={handleAppleSignIn}
+                      disabled={isLoading}
+                      activeOpacity={0.8}
+                    >
+                      <LinearGradient
+                        colors={['rgba(0,0,0,0.9)', 'rgba(0,0,0,0.8)']}
+                        style={styles.socialButtonGradient}
+                      >
+                        <View style={styles.socialButtonIcon}>
+                          <AppleIcon size={20} color="white" />
+                        </View>
+                        <Text style={[styles.socialButtonText, { color: 'white' }]}>Apple ile Giriş</Text>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  )}
+
+                  {/* Facebook Sign In */}
+                  <TouchableOpacity 
+                    style={styles.socialButton}
+                    onPress={handleFacebookSignIn}
+                    disabled={isLoading}
+                    activeOpacity={0.8}
+                  >
+                    <LinearGradient
+                      colors={['#1877F2', '#166FE5']}
+                      style={styles.socialButtonGradient}
+                    >
+                      <View style={styles.socialButtonIcon}>
+                        <FacebookIcon size={20} color="white" />
+                      </View>
+                      <Text style={[styles.socialButtonText, { color: 'white' }]}>Facebook ile Giriş</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+
+                  {/* Instagram Sign In */}
+                   <TouchableOpacity 
+                     style={styles.socialButton}
+                     onPress={handleInstagramSignIn}
+                     disabled={isLoading}
+                     activeOpacity={0.8}
+                   >
+                    <LinearGradient
+                      colors={['#E4405F', '#C13584']}
+                      style={styles.socialButtonGradient}
+                    >
+                      <View style={styles.socialButtonIcon}>
+                        <InstagramIcon size={20} color="white" />
+                      </View>
+                      <Text style={[styles.socialButtonText, { color: 'white' }]}>Instagram ile Giriş</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Sign Up */}
+                <View style={styles.signupContainer}>
+                  <Text style={styles.signupText}>{t('auth.noAccount')} </Text>
+                  <TouchableOpacity onPress={handleSignUp}>
+                    <Text style={styles.signupLink}>{t('auth.signUp')}</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
-            </View>
-          </BlurView>
+            </BlurView>
+          )}
         </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -584,6 +768,9 @@ const styles = StyleSheet.create({
   formBlur: {
     borderRadius: wp(6),
     overflow: 'hidden',
+    backgroundColor: 'rgba(118, 75, 162, 0.3)',
+    borderWidth: 1,
+    borderColor: 'rgba(240, 147, 251, 0.4)',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -592,6 +779,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 20,
     elevation: 10,
+  },
+  androidFormBlur: {
+    backgroundColor: 'rgba(118, 75, 162, 0.8)',
   },
   form: {
     padding: wp(7.5),

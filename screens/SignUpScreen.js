@@ -12,6 +12,7 @@ import {
   Dimensions,
   ScrollView,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -31,6 +32,8 @@ export default function SignUpScreen({ navigation }) {
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [confirmPasswordFocused, setConfirmPasswordFocused] = useState(false);
   const [fullNameFocused, setFullNameFocused] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
   const { signUp } = useAuth();
   const { t } = useLanguage();
@@ -38,6 +41,12 @@ export default function SignUpScreen({ navigation }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
+  
+  // TextInput refs for keyboard navigation
+  const fullNameRef = useRef(null);
+  const emailRef = useRef(null);
+  const passwordRef = useRef(null);
+  const confirmPasswordRef = useRef(null);
 
   useEffect(() => {
     Animated.parallel([
@@ -156,12 +165,15 @@ export default function SignUpScreen({ navigation }) {
                   <Text style={styles.label}>{t('auth.fullName')}</Text>
                   <View style={[styles.inputWrapper, fullNameFocused && styles.inputWrapperFocused]}>
                     <TextInput
+                      ref={fullNameRef}
                       style={styles.input}
                       value={fullName}
                       onChangeText={setFullName}
                       placeholder={t('auth.fullNamePlaceholder')}
                       placeholderTextColor="rgba(255,255,255,0.6)"
                       autoCapitalize="words"
+                      returnKeyType="next"
+                      onSubmitEditing={() => emailRef.current?.focus()}
                       onFocus={() => setFullNameFocused(true)}
                       onBlur={() => setFullNameFocused(false)}
                     />
@@ -173,6 +185,7 @@ export default function SignUpScreen({ navigation }) {
                   <Text style={styles.label}>{t('auth.email')}</Text>
                   <View style={[styles.inputWrapper, emailFocused && styles.inputWrapperFocused]}>
                     <TextInput
+                      ref={emailRef}
                       style={styles.input}
                       value={email}
                       onChangeText={setEmail}
@@ -181,6 +194,8 @@ export default function SignUpScreen({ navigation }) {
                       keyboardType="email-address"
                       autoCapitalize="none"
                       autoCorrect={false}
+                      returnKeyType="next"
+                      onSubmitEditing={() => passwordRef.current?.focus()}
                       onFocus={() => setEmailFocused(true)}
                       onBlur={() => setEmailFocused(false)}
                     />
@@ -192,16 +207,33 @@ export default function SignUpScreen({ navigation }) {
                   <Text style={styles.label}>{t('auth.password')}</Text>
                   <View style={[styles.inputWrapper, passwordFocused && styles.inputWrapperFocused]}>
                     <TextInput
-                      style={styles.input}
+                      ref={passwordRef}
+                      style={[styles.input, { paddingRight: 50, backgroundColor: 'white' }]}
                       value={password}
                       onChangeText={setPassword}
-                      placeholder={t('auth.passwordRequirement')}
-                      placeholderTextColor="rgba(255,255,255,0.6)"
-                      secureTextEntry
+                      placeholder={t('auth.passwordPlaceholder')}
+                      placeholderTextColor="rgba(0,0,0,0.6)"
+                      secureTextEntry={!showPassword}
                       autoCapitalize="none"
+                      autoComplete="off"
+                      textContentType="none"
+                      passwordRules=""
+                      importantForAutofill="no"
+                      returnKeyType="next"
+                      onSubmitEditing={() => confirmPasswordRef.current?.focus()}
                       onFocus={() => setPasswordFocused(true)}
                       onBlur={() => setPasswordFocused(false)}
                     />
+                    <TouchableOpacity
+                      style={styles.eyeButton}
+                      onPress={() => setShowPassword(!showPassword)}
+                    >
+                      <Ionicons
+                        name={showPassword ? 'eye-off' : 'eye'}
+                        size={20}
+                        color="rgba(0,0,0,0.7)"
+                      />
+                    </TouchableOpacity>
                   </View>
                 </View>
 
@@ -210,16 +242,33 @@ export default function SignUpScreen({ navigation }) {
                   <Text style={styles.label}>{t('auth.confirmPassword')}</Text>
                   <View style={[styles.inputWrapper, confirmPasswordFocused && styles.inputWrapperFocused]}>
                     <TextInput
-                      style={styles.input}
+                      ref={confirmPasswordRef}
+                      style={[styles.input, { paddingRight: 50, backgroundColor: 'white' }]}
                       value={confirmPassword}
                       onChangeText={setConfirmPassword}
                       placeholder={t('auth.confirmPasswordPlaceholder')}
-                      placeholderTextColor="rgba(255,255,255,0.6)"
-                      secureTextEntry
+                      placeholderTextColor="rgba(0,0,0,0.6)"
+                      secureTextEntry={!showConfirmPassword}
                       autoCapitalize="none"
+                      autoComplete="off"
+                      textContentType="none"
+                      passwordRules=""
+                      importantForAutofill="no"
+                      returnKeyType="done"
+                      onSubmitEditing={handleSignUp}
                       onFocus={() => setConfirmPasswordFocused(true)}
                       onBlur={() => setConfirmPasswordFocused(false)}
                     />
+                    <TouchableOpacity
+                      style={styles.eyeButton}
+                      onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                    >
+                      <Ionicons
+                        name={showConfirmPassword ? 'eye-off' : 'eye'}
+                        size={20}
+                        color="rgba(0,0,0,0.7)"
+                      />
+                    </TouchableOpacity>
                   </View>
                 </View>
 
@@ -365,7 +414,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 15,
     fontSize: 16,
-    color: 'white',
+    color: 'black',
+    backgroundColor: 'white',
+  },
+  eyeButton: {
+    position: 'absolute',
+    right: 15,
+    top: 15,
+    padding: 5,
   },
   signUpButton: {
     borderRadius: 20,
