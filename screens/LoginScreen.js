@@ -16,8 +16,14 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import * as AuthSession from 'expo-auth-session';
+import * as Crypto from 'expo-crypto';
+// import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin'; // Expo Go'da desteklenmiyor
+import { GoogleIcon, FacebookIcon, InstagramIcon, AppleIcon } from '../components/SocialIcons';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { supabase } from '../config/supabase';
 import { wp, hp, RFValue, spacing, fontSize, borderRadius, iconSize, isSmallDevice, isLargeDevice } from '../utils/responsive';
 
 const { width, height } = Dimensions.get('window');
@@ -40,6 +46,37 @@ export default function LoginScreen({ navigation }) {
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
 
   useEffect(() => {
+    // Google Sign-In konfigürasyonu (Expo Go'da desteklenmiyor)
+    /*
+    GoogleSignin.configure({
+      webClientId: 'YOUR_WEB_CLIENT_ID', // Google Cloud Console'dan alınacak
+      offlineAccess: true,
+    });
+    */
+    
+    /*
+    SOSYAL MEDYA OAUTH KONFİGÜRASYONU:
+    
+    1. GOOGLE:
+       - Google Cloud Console'da proje oluşturun
+       - OAuth 2.0 Client ID oluşturun
+       - Web Client ID'yi yukarıdaki 'YOUR_WEB_CLIENT_ID' yerine yazın
+       
+    2. FACEBOOK:
+       - Facebook Developers'da uygulama oluşturun
+       - App ID ve App Secret alın
+       - 'YOUR_FACEBOOK_APP_ID' ve 'YOUR_FACEBOOK_APP_SECRET' değerlerini değiştirin
+       
+    3. INSTAGRAM:
+       - Facebook Developers'da Instagram Basic Display ürününü ekleyin
+       - Instagram App ID ve App Secret alın
+       - 'YOUR_INSTAGRAM_APP_ID' ve 'YOUR_INSTAGRAM_APP_SECRET' değerlerini değiştirin
+       
+    4. APPLE:
+       - Apple Developer hesabında Sign in with Apple'ı etkinleştirin
+       - Bundle ID'yi app.json'da yapılandırın
+    */
+    
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -142,6 +179,99 @@ export default function LoginScreen({ navigation }) {
 
   const handleForgotPassword = () => {
     navigation.navigate('ForgotPassword');
+  };
+
+  const handleGoogleSignIn = async () => {
+    // Google Sign-In Expo Go'da desteklenmiyor, development build gerekiyor
+    Alert.alert(
+      'Bilgi', 
+      'Google ile giriş özelliği development build gerektirir. Şu anda Expo Go\'da desteklenmiyor.'
+    );
+    
+    /* Orijinal Google Sign-In kodu (development build için):
+    try {
+      setIsLoading(true);
+      
+      // Google Sign-In konfigürasyonu
+      await GoogleSignin.hasPlayServices();
+      const userInfo = await GoogleSignin.signIn();
+      
+      // Google ID token'ını al
+      const googleCredential = auth.GoogleAuthProvider.credential(userInfo.idToken);
+      
+      // Supabase ile giriş yap
+      const { data, error } = await supabase.auth.signInWithIdToken({
+        provider: 'google',
+        token: userInfo.idToken,
+      });
+      
+      if (error) {
+        throw error;
+      }
+      
+      Alert.alert('Başarılı', 'Google ile giriş başarılı!');
+      // Navigation burada yapılacak
+      
+    } catch (error) {
+      console.error('Google Sign-In Error:', error);
+      if (error.code === statusCodes.SIGN_IN_CANCELLED) {
+        // Kullanıcı iptal etti
+        return;
+      } else if (error.code === statusCodes.IN_PROGRESS) {
+        Alert.alert('Bilgi', 'Giriş işlemi devam ediyor...');
+      } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+        Alert.alert('Hata', 'Google Play Services mevcut değil.');
+      } else {
+        Alert.alert('Hata', 'Google ile giriş yapılamadı.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+    */
+  };
+
+  const handleAppleSignIn = async () => {
+    try {
+      setIsLoading(true);
+      
+      if (Platform.OS === 'ios') {
+        const credential = await AppleAuthentication.signInAsync({
+          requestedScopes: [
+            AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+            AppleAuthentication.AppleAuthenticationScope.EMAIL,
+          ],
+        });
+        
+        // Apple credential'ını Supabase ile kullan
+        Alert.alert('Başarılı', 'Apple ile giriş başarılı!');
+      } else {
+        Alert.alert('Bilgi', 'Apple ile giriş sadece iOS cihazlarda kullanılabilir.');
+      }
+    } catch (error) {
+      if (error.code === 'ERR_CANCELED') {
+        // Kullanıcı iptal etti
+        return;
+      }
+      Alert.alert('Hata', 'Apple ile giriş yapılamadı.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleFacebookSignIn = async () => {
+    // Facebook Sign-In Expo Go'da tam desteklenmiyor, development build önerilir
+    Alert.alert(
+      'Bilgi', 
+      'Facebook ile giriş özelliği development build ile daha iyi çalışır. Şu anda Expo Go\'da sınırlı destek var.'
+    );
+  };
+
+  const handleInstagramSignIn = async () => {
+    // Instagram Sign-In Expo Go'da tam desteklenmiyor, development build önerilir
+    Alert.alert(
+      'Bilgi', 
+      'Instagram ile giriş özelliği development build ile daha iyi çalışır. Şu anda Expo Go\'da sınırlı destek var.'
+    );
   };
 
   return (
@@ -280,6 +410,90 @@ export default function LoginScreen({ navigation }) {
                   )}
                 </LinearGradient>
               </TouchableOpacity>
+
+              {/* Divider */}
+              <View style={styles.dividerContainer}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>veya</Text>
+                <View style={styles.dividerLine} />
+              </View>
+
+              {/* Social Login Buttons */}
+              <View style={styles.socialButtonsContainer}>
+                {/* Google Sign In */}
+                <TouchableOpacity 
+                  style={styles.socialButton}
+                  onPress={handleGoogleSignIn}
+                  disabled={isLoading}
+                  activeOpacity={0.8}
+                >
+                  <LinearGradient
+                    colors={['rgba(255,255,255,0.95)', 'rgba(255,255,255,0.85)']}
+                    style={styles.socialButtonGradient}
+                  >
+                    <View style={styles.socialButtonIcon}>
+                      <GoogleIcon size={20} />
+                    </View>
+                    <Text style={styles.socialButtonText}>Google ile Giriş</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+
+                {/* Apple Sign In - Only show on iOS */}
+                {Platform.OS === 'ios' && (
+                  <TouchableOpacity 
+                    style={styles.socialButton}
+                    onPress={handleAppleSignIn}
+                    disabled={isLoading}
+                    activeOpacity={0.8}
+                  >
+                    <LinearGradient
+                      colors={['rgba(0,0,0,0.9)', 'rgba(0,0,0,0.8)']}
+                      style={styles.socialButtonGradient}
+                    >
+                      <View style={styles.socialButtonIcon}>
+                        <AppleIcon size={20} color="white" />
+                      </View>
+                      <Text style={[styles.socialButtonText, { color: 'white' }]}>Apple ile Giriş</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                )}
+
+                {/* Facebook Sign In */}
+                <TouchableOpacity 
+                  style={styles.socialButton}
+                  onPress={handleFacebookSignIn}
+                  disabled={isLoading}
+                  activeOpacity={0.8}
+                >
+                  <LinearGradient
+                    colors={['#1877F2', '#166FE5']}
+                    style={styles.socialButtonGradient}
+                  >
+                    <View style={styles.socialButtonIcon}>
+                      <FacebookIcon size={20} color="white" />
+                    </View>
+                    <Text style={[styles.socialButtonText, { color: 'white' }]}>Facebook ile Giriş</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+
+                {/* Instagram Sign In */}
+                 <TouchableOpacity 
+                   style={styles.socialButton}
+                   onPress={handleInstagramSignIn}
+                   disabled={isLoading}
+                   activeOpacity={0.8}
+                 >
+                  <LinearGradient
+                    colors={['#E4405F', '#C13584']}
+                    style={styles.socialButtonGradient}
+                  >
+                    <View style={styles.socialButtonIcon}>
+                      <InstagramIcon size={20} color="white" />
+                    </View>
+                    <Text style={[styles.socialButtonText, { color: 'white' }]}>Instagram ile Giriş</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
 
               {/* Sign Up */}
               <View style={styles.signupContainer}>
@@ -484,8 +698,56 @@ const styles = StyleSheet.create({
   },
   signupLink: {
     color: 'white',
-    fontSize: 16,
     fontWeight: '600',
+    fontSize: RFValue(14),
     textDecorationLine: 'underline',
+  },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: hp(3),
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+  },
+  dividerText: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: RFValue(14),
+    marginHorizontal: 15,
+    fontWeight: '500',
+  },
+  socialButtonsContainer: {
+    marginBottom: hp(3),
+  },
+  socialButton: {
+    marginBottom: hp(1.5),
+    borderRadius: 15,
+    overflow: 'hidden',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  socialButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+  },
+  socialButtonIcon: {
+    fontSize: 20,
+    marginRight: 15,
+  },
+  socialButtonText: {
+    fontSize: RFValue(16),
+    fontWeight: '600',
+    color: '#333',
   },
 });

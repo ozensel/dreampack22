@@ -39,10 +39,24 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const getInitialSession = async () => {
-    const { session } = await authService.getSession();
-    setSession(session);
-    setUser(session?.user ?? null);
-    setLoading(false);
+    try {
+      const { session, error } = await authService.getSession();
+      if (error) {
+        console.log('Session error:', error);
+        // Hatalı session durumunda temizle
+        setSession(null);
+        setUser(null);
+      } else {
+        setSession(session);
+        setUser(session?.user ?? null);
+      }
+    } catch (error) {
+      console.log('Initial session error:', error);
+      setSession(null);
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const signIn = async (email, password) => {
@@ -60,15 +74,30 @@ export const AuthProvider = ({ children }) => {
   };
 
   const signOut = async () => {
-    setLoading(true);
-    const result = await authService.signOut();
+    // Hemen local state'i temizle - hiçbir hata durumunda bekletme
+    setSession(null);
+    setUser(null);
     setLoading(false);
-    return result;
+    
+    // Arka planda sessizce Supabase ve AsyncStorage temizliği yap
+    setTimeout(async () => {
+      try {
+        await authService.signOut();
+      } catch (error) {
+        // Sessizce ignore et
+        console.log('Background signOut completed with error (ignored):', error);
+      }
+    }, 0);
+    
+    // Anında başarılı sonuç döndür
+    return { success: true };
   };
 
   const resetPassword = async (email) => {
     return await authService.resetPassword(email);
   };
+
+
 
   const value = {
     user,

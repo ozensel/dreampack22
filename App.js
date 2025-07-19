@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -9,12 +9,21 @@ import SignUpScreen from './screens/SignUpScreen';
 import ForgotPasswordScreen from './screens/ForgotPasswordScreen';
 import HomeScreen from './screens/HomeScreen';
 import DreamInterpretationScreen from './screens/DreamInterpretationScreen';
+import NotificationSettingsScreen from './screens/NotificationSettingsScreen';
 import { ActivityIndicator, View } from 'react-native';
+import notificationService from './services/notificationService';
 
 const Stack = createStackNavigator();
 
 function AppNavigator() {
   const { user, loading } = useAuth();
+
+  useEffect(() => {
+    if (user) {
+      // Kullanıcı giriş yaptığında bildirim servisini başlat
+      notificationService.registerForPushNotificationsAsync();
+    }
+  }, [user]);
 
   if (loading) {
     return (
@@ -31,6 +40,7 @@ function AppNavigator() {
           <>
             <Stack.Screen name="DreamInterpretation" component={DreamInterpretationScreen} />
             <Stack.Screen name="Home" component={HomeScreen} />
+            <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
           </>
         ) : (
           <>

@@ -27,17 +27,23 @@ export const LanguageProvider = ({ children }) => {
       } else {
         // Cihaz dilini algıla
         const deviceLocale = Localization.locale;
+        console.log('Device locale detected:', deviceLocale);
+        
         if (deviceLocale) {
           const deviceLanguage = deviceLocale.split('-')[0]; // 'en-US' -> 'en'
+          console.log('Device language extracted:', deviceLanguage);
           
           // Desteklenen diller arasında cihaz dili varsa onu kullan
           if (LANGUAGES[deviceLanguage]) {
+            console.log('Device language supported, setting to:', deviceLanguage);
             changeLanguage(deviceLanguage);
           } else {
+            console.log('Device language not supported, using default:', DEFAULT_LANGUAGE);
             // Desteklenmiyorsa varsayılan dili kullan
             changeLanguage(DEFAULT_LANGUAGE);
           }
         } else {
+          console.log('Device locale not detected, using default:', DEFAULT_LANGUAGE);
           // Cihaz dili algılanamazsa varsayılan dili kullan
           changeLanguage(DEFAULT_LANGUAGE);
         }

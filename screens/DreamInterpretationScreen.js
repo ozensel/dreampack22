@@ -28,6 +28,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { dreamService } from '../services/dreamService';
 import { supabase } from '../config/supabase';
+import notificationService from '../services/notificationService';
 import { wp, hp, RFValue, spacing, fontSize, borderRadius, iconSize, isSmallDevice, isLargeDevice } from '../utils/responsive';
 
 
@@ -234,6 +235,9 @@ export default function DreamInterpretationScreen({ navigation }) {
             interpretation: interpretResult.data.interpretation
           });
           
+          // Rüya yorumu hazır bildirimi gönder
+          await notificationService.sendDreamInterpretationReady();
+          
           setDreamText('');
           setSelectedCategory('');
           setSelectedFamousPerson('');
@@ -259,6 +263,8 @@ export default function DreamInterpretationScreen({ navigation }) {
       ]
     );
   };
+
+
 
   const handleEditProfile = () => {
     // Mevcut kullanıcı bilgilerini form'a yükle
@@ -340,23 +346,7 @@ export default function DreamInterpretationScreen({ navigation }) {
 
   // Notification Settings Handlers
   const handlePushNotifications = () => {
-    Alert.alert(
-      t('pushNotifications') || 'Anlık Bildirimler',
-      t('pushNotificationsDesc') || 'Anlık bildirim ayarlarınızı yönetin.',
-      [
-        { text: t('cancel') || 'İptal', style: 'cancel' },
-        { 
-          text: t('settings') || 'Ayarlar', 
-          onPress: () => {
-            if (Platform.OS === 'ios') {
-              Linking.openURL('app-settings:');
-            } else {
-              Linking.openSettings();
-            }
-          }
-        }
-      ]
-    );
+    navigation.navigate('NotificationSettings');
   };
 
   const handleEmailNotifications = (value) => {
@@ -808,7 +798,7 @@ Bu talep DreamPack uygulaması üzerinden gönderilmiştir.`;
     >
       {/* Quick Stats */}
       <Animated.View style={[styles.statsContainer, { opacity: fadeAnim }]}>
-        <BlurView intensity={20} style={styles.statsBlur}>
+        <BlurView intensity={Platform.OS === 'android' ? 40 : 20} style={styles.statsBlur}>
           <View style={styles.statsContent}>
             <View style={styles.statItem}>
               <Text style={styles.statNumber}>{dreamStats.total}</Text>
@@ -830,7 +820,7 @@ Bu talep DreamPack uygulaması üzerinden gönderilmiştir.`;
 
       {/* Dream Input Section */}
       <Animated.View style={[styles.section, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-        <BlurView intensity={20} style={styles.sectionBlur}>
+        <BlurView intensity={Platform.OS === 'android' ? 40 : 20} style={styles.sectionBlur}>
           <View style={styles.sectionContent}>
             <Text style={styles.sectionTitle}><Ionicons name="moon" size={18} color="white" /> {t('addNewDream')}</Text>
             
@@ -918,7 +908,7 @@ Bu talep DreamPack uygulaması üzerinden gönderilmiştir.`;
       {/* Interpretation Result */}
       {interpretation ? (
         <Animated.View style={[styles.section, { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>
-          <BlurView intensity={20} style={styles.sectionBlur}>
+          <BlurView intensity={Platform.OS === 'android' ? 40 : 20} style={styles.sectionBlur}>
             <View style={styles.sectionContent}>
               <Text style={styles.sectionTitle}>✨ Rüya Yorumu</Text>
               <Text style={styles.interpretationText}>{interpretation}</Text>
@@ -938,9 +928,9 @@ Bu talep DreamPack uygulaması üzerinden gönderilmiştir.`;
   const renderDreamsTab = () => (
     <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.scrollContent}>
       <Animated.View style={[styles.section, { opacity: fadeAnim }]}>
-        <BlurView intensity={20} style={styles.sectionBlur}>
-          <View style={styles.sectionContent}>
-            <Text style={styles.sectionTitle}>📚 {t('myDreamHistory')}</Text>
+        <BlurView intensity={Platform.OS === 'android' ? 40 : 20} style={styles.sectionBlur}>
+            <View style={styles.sectionContent}>
+              <Text style={styles.sectionTitle}>📚 {t('myDreamHistory')}</Text>
             {recentDreams.length > 0 ? (
               recentDreams.map((dream, index) => {
                 const category = categories.find(c => c.id === dream.category);
@@ -986,9 +976,9 @@ Bu talep DreamPack uygulaması üzerinden gönderilmiştir.`;
   const renderStatsTab = () => (
     <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.scrollContent}>
       <Animated.View style={[styles.section, { opacity: fadeAnim }]}>
-        <BlurView intensity={20} style={styles.sectionBlur}>
-          <View style={styles.sectionContent}>
-            <Text style={styles.sectionTitle}>📊 {t('statistics')}</Text>
+        <BlurView intensity={Platform.OS === 'android' ? 40 : 20} style={styles.sectionBlur}>
+            <View style={styles.sectionContent}>
+              <Text style={styles.sectionTitle}>📊 {t('statistics')}</Text>
             
             <View style={styles.statsGrid}>
               <View style={styles.statCard}>
@@ -1037,7 +1027,7 @@ Bu talep DreamPack uygulaması üzerinden gönderilmiştir.`;
   const renderProfileTab = () => (
     <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.scrollContent}>
       <Animated.View style={[styles.section, { opacity: fadeAnim }]}>
-        <BlurView intensity={20} style={styles.sectionBlur}>
+        <BlurView intensity={Platform.OS === 'android' ? 40 : 20} style={styles.sectionBlur}>
           <View style={styles.sectionContent}>
             {/* Enhanced Profile Header */}
             <View style={styles.enhancedProfileHeader}>
@@ -1480,7 +1470,7 @@ Bu talep DreamPack uygulaması üzerinden gönderilmiştir.`;
 
         {/* Modern Floating Tab Bar */}
         <Animated.View style={[styles.floatingTabBar, { opacity: fadeAnim }]}>
-          <BlurView intensity={40} style={styles.tabBarBlur}>
+          <BlurView intensity={Platform.OS === 'android' ? 60 : 40} style={styles.tabBarBlur}>
             <LinearGradient
               colors={['rgba(255,255,255,0.15)', 'rgba(255,255,255,0.05)']}
               style={styles.tabBarGradient}
@@ -1568,7 +1558,7 @@ Bu talep DreamPack uygulaması üzerinden gönderilmiştir.`;
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
-            <BlurView intensity={30} style={styles.modalBlur}>
+            <BlurView intensity={Platform.OS === 'android' ? 80 : 30} style={styles.modalBlur}>
               <View style={styles.modalContent}>
                 <View style={styles.modalHeader}>
                   <Text style={styles.modalTitle}>🎭 {t('selectInterpreter')}</Text>
@@ -2786,7 +2776,7 @@ const getStyles = (darkMode) => StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: Platform.OS === 'android' ? 'rgba(0,0,0,0.8)' : 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
   modalContainer: {
@@ -3803,10 +3793,14 @@ const getStyles = (darkMode) => StyleSheet.create({
      
    },
    modernTabItemActive: {
-     backgroundColor: 'rgba(255,255,255,0.15)',
-     paddingHorizontal: wp(3),
-     minWidth: wp(20),
-   },
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: wp(3),
+    minWidth: wp(20),
+    ...(Platform.OS === 'android' && {
+      borderBottomWidth: 0,
+      elevation: 0,
+    }),
+  },
    tabIconContainer: {
      width: wp(8),
      height: wp(8),

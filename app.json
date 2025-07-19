@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "dreampack22",
-    "slug": "dreampack22",
+    "slug": "dreampack22-v2",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -13,17 +13,48 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "background-processing",
+          "background-fetch"
+        ]
+      },
+      "usesAppleSignIn": true
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.furkan3498.dreampack22v2",
+      "permissions": [
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE",
+        "WAKE_LOCK"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#8B5CF6",
+          "defaultChannel": "default"
+        }
+      ],
+      "expo-localization",
+      "@react-native-google-signin/google-signin"
+    ],
+    "scheme": "dreampack22",
+    "extra": {
+      "eas": {
+        "projectId": "24596275-50d2-480f-8b95-0e79b95dc03e"
+      }
     }
   }
 }

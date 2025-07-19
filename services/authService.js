@@ -47,18 +47,27 @@ class AuthService {
   // Çıkış yap
   async signOut() {
     try {
-      const { error } = await supabase.auth.signOut();
-      
-      if (error) throw error;
-
-      // Local storage'ı temizle
+      // Önce local storage'ı temizle
       await AsyncStorage.removeItem('userToken');
       await AsyncStorage.removeItem('isLoggedIn');
       await AsyncStorage.removeItem('userEmail');
+      
+      // Sonra Supabase'den çıkış yapmaya çalış
+      try {
+        const { error } = await supabase.auth.signOut();
+        if (error) {
+          console.log('Supabase signOut error (ignored):', error.message);
+        }
+      } catch (networkError) {
+        // Network hatası olsa bile devam et
+        console.log('Network error during signOut (ignored):', networkError.message);
+      }
 
       return { success: true };
     } catch (error) {
-      return { success: false, error: error.message };
+      // AsyncStorage hatası durumunda bile başarılı döndür
+      console.log('AsyncStorage error during signOut (ignored):', error.message);
+      return { success: true };
     }
   }
 
@@ -80,11 +89,19 @@ class AuthService {
     try {
       const { data: { session }, error } = await supabase.auth.getSession();
       
-      if (error) throw error;
+      if (error) {
+        // Refresh token hatası durumunda session'ı temizle
+        if (error.message.includes('refresh_token_not_found') || error.message.includes('Invalid Refresh Token')) {
+          await this.signOut();
+          return { success: true, session: null };
+        }
+        throw error;
+      }
       
       return { success: true, session };
     } catch (error) {
-      return { success: false, error: error.message };
+      console.log('getSession error:', error.message);
+      return { success: false, error: error.message, session: null };
     }
   }
 

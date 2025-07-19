@@ -117,59 +117,80 @@ export default function HomeScreen({ navigation }) {
           </View>
 
           {/* Stats Overview */}
-          <BlurView intensity={20} style={styles.statsCard}>
-            <LinearGradient
-              colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
-              style={styles.statsGradient}
-            >
-              <View style={styles.statsContent}>
-                <View style={styles.statItem}>
-                  <Text style={styles.statNumber}>{dreamCount}</Text>
-                  <Text style={styles.statLabel}>Toplam Rüya</Text>
-                </View>
-                <View style={styles.statDivider} />
-                <View style={styles.statItem}>
-                  <Text style={styles.statNumber}>{recentDreams.length}</Text>
-                  <Text style={styles.statLabel}>Bu Hafta</Text>
-                </View>
-                <View style={styles.statDivider} />
-                <View style={styles.statItem}>
-                  <Text style={styles.statNumber}>7</Text>
-                  <Text style={styles.statLabel}>Günlük Seri</Text>
-                </View>
+          <View style={styles.statsContainer}>
+            <TouchableOpacity style={[styles.statCard, { backgroundColor: '#667eea' }]}>
+              <View style={styles.statIconContainer}>
+                <Ionicons name="moon" size={wp(8)} color="white" />
               </View>
-            </LinearGradient>
-          </BlurView>
+              <Text style={styles.statNumber}>{dreamCount}</Text>
+              <Text style={styles.statLabel}>Toplam Rüya</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={[styles.statCard, { backgroundColor: '#f093fb' }]}>
+              <View style={styles.statIconContainer}>
+                <Ionicons name="calendar" size={wp(8)} color="white" />
+              </View>
+              <Text style={styles.statNumber}>{recentDreams.length}</Text>
+              <Text style={styles.statLabel}>Bu Hafta</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={[styles.statCard, { backgroundColor: '#4facfe' }]}>
+              <View style={styles.statIconContainer}>
+                <Ionicons name="flame" size={wp(8)} color="white" />
+              </View>
+              <Text style={styles.statNumber}>7</Text>
+              <Text style={styles.statLabel}>Günlük Seri</Text>
+            </TouchableOpacity>
+          </View>
 
           {/* Quick Actions */}
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Hızlı Erişim</Text>
           </View>
           
-          <View style={styles.actionsGrid}>
-            {quickActions.map((action) => (
-              <TouchableOpacity
-                key={action.id}
-                style={styles.actionCard}
-                onPress={action.onPress}
-                activeOpacity={0.8}
-              >
-                <LinearGradient
-                  colors={action.colors}
-                  style={styles.actionGradient}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                >
-                  <View style={styles.actionContent}>
-                    <View style={styles.actionIcon}>
-                      <Ionicons name={action.icon} size={wp(8)} color="white" />
-                    </View>
-                    <Text style={styles.actionTitle}>{action.title}</Text>
-                    <Text style={styles.actionSubtitle}>{action.subtitle}</Text>
+          <View style={styles.modernActionsContainer}>
+            <TouchableOpacity 
+              style={[styles.modernActionCard, styles.primaryAction]}
+              onPress={() => navigation.navigate('DreamInterpretation')}
+              activeOpacity={0.9}
+            >
+              <View style={styles.modernActionContent}>
+                <View style={styles.modernActionLeft}>
+                  <View style={styles.modernActionIcon}>
+                    <Ionicons name="add-circle" size={wp(10)} color="white" />
                   </View>
-                </LinearGradient>
+                  <View style={styles.modernActionText}>
+                    <Text style={styles.modernActionTitle}>Rüya Ekle</Text>
+                    <Text style={styles.modernActionSubtitle}>Yeni rüyanı kaydet ve yorumla</Text>
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward" size={wp(6)} color="rgba(255,255,255,0.7)" />
+              </View>
+            </TouchableOpacity>
+            
+            <View style={styles.secondaryActionsRow}>
+              <TouchableOpacity 
+                style={[styles.modernActionCard, styles.secondaryAction, { backgroundColor: '#ff6b6b' }]}
+                onPress={() => navigation.navigate('DreamInterpretation', { tab: 'dreams' })}
+                activeOpacity={0.9}
+              >
+                <View style={styles.secondaryActionContent}>
+                  <Ionicons name="moon" size={wp(7)} color="white" />
+                  <Text style={styles.secondaryActionTitle}>Rüyalarım</Text>
+                </View>
               </TouchableOpacity>
-            ))}
+              
+              <TouchableOpacity 
+                style={[styles.modernActionCard, styles.secondaryAction, { backgroundColor: '#4ecdc4' }]}
+                onPress={() => navigation.navigate('DreamInterpretation', { tab: 'stats' })}
+                activeOpacity={0.9}
+              >
+                <View style={styles.secondaryActionContent}>
+                  <Ionicons name="stats-chart" size={wp(7)} color="white" />
+                  <Text style={styles.secondaryActionTitle}>İstatistikler</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Recent Dreams */}
@@ -183,26 +204,37 @@ export default function HomeScreen({ navigation }) {
               </View>
               
               <View style={styles.recentDreams}>
-                {recentDreams.map((dream, index) => (
-                  <BlurView key={index} intensity={15} style={styles.dreamCard}>
-                    <LinearGradient
-                      colors={['rgba(255,255,255,0.08)', 'rgba(255,255,255,0.03)']}
-                      style={styles.dreamGradient}
+                {recentDreams.map((dream, index) => {
+                  const cardColors = ['#6c5ce7', '#fd79a8', '#00b894'];
+                  return (
+                    <TouchableOpacity 
+                      key={index} 
+                      style={[styles.modernDreamCard, { backgroundColor: cardColors[index % cardColors.length] }]}
+                      activeOpacity={0.8}
                     >
-                      <View style={styles.dreamContent}>
-                        <View style={styles.dreamHeader}>
-                          <Ionicons name="moon" size={wp(5)} color="#667eea" />
-                          <Text style={styles.dreamDate}>
+                      <View style={styles.modernDreamContent}>
+                        <View style={styles.modernDreamHeader}>
+                          <View style={styles.dreamIconBadge}>
+                            <Ionicons name="moon" size={wp(4)} color="white" />
+                          </View>
+                          <Text style={styles.modernDreamDate}>
                             {new Date(dream.date).toLocaleDateString('tr-TR')}
                           </Text>
+                          <View style={styles.dreamTypeBadge}>
+                            <Text style={styles.dreamTypeText}>Rüya</Text>
+                          </View>
                         </View>
-                        <Text style={styles.dreamText} numberOfLines={2}>
+                        <Text style={styles.modernDreamText} numberOfLines={2}>
                           {dream.dream || 'Rüya metni...'}
                         </Text>
+                        <View style={styles.dreamFooter}>
+                          <Text style={styles.readMoreText}>Devamını oku</Text>
+                          <Ionicons name="arrow-forward" size={wp(4)} color="rgba(255,255,255,0.8)" />
+                        </View>
                       </View>
-                    </LinearGradient>
-                  </BlurView>
-                ))}
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </>
           )}
@@ -262,43 +294,44 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.2)',
   },
-  statsCard: {
-    marginHorizontal: wp(5),
-    marginBottom: hp(3),
-    borderRadius: wp(4),
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  statsGradient: {
-    padding: wp(5),
-  },
-  statsContent: {
+  statsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
+    paddingHorizontal: wp(5),
+    marginBottom: hp(3),
+    justifyContent: 'space-between',
   },
-  statItem: {
-    alignItems: 'center',
+  statCard: {
     flex: 1,
+    marginHorizontal: wp(1),
+    borderRadius: wp(4),
+    padding: wp(4),
+    alignItems: 'center',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
+  },
+  statIconContainer: {
+    marginBottom: hp(1),
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: wp(6),
+    padding: wp(2),
   },
   statNumber: {
-    fontSize: RFValue(24),
+    fontSize: RFValue(20),
     color: 'white',
     fontWeight: 'bold',
     marginBottom: hp(0.5),
   },
   statLabel: {
-    fontSize: RFValue(12),
-    color: 'rgba(255,255,255,0.7)',
-    fontWeight: '500',
+    fontSize: RFValue(11),
+    color: 'white',
+    fontWeight: '600',
     textAlign: 'center',
-  },
-  statDivider: {
-    width: 1,
-    height: hp(4),
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    marginHorizontal: wp(2),
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -317,82 +350,141 @@ const styles = StyleSheet.create({
     color: '#667eea',
     fontWeight: '600',
   },
-  actionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: wp(3),
+  modernActionsContainer: {
+    paddingHorizontal: wp(5),
     marginBottom: hp(3),
   },
-  actionCard: {
-    width: (width - wp(8)) / 2,
-    marginHorizontal: wp(1),
-    marginBottom: hp(2),
+  modernActionCard: {
     borderRadius: wp(4),
-    overflow: 'hidden',
-    elevation: 5,
+    marginBottom: hp(2),
+    elevation: 6,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 3,
     },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    shadowOpacity: 0.27,
+    shadowRadius: 4.65,
   },
-  actionGradient: {
-    padding: wp(4),
-    minHeight: hp(15),
-    justifyContent: 'center',
+  primaryAction: {
+    backgroundColor: '#2d3436',
+    padding: wp(5),
   },
-  actionContent: {
+  modernActionContent: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  actionIcon: {
-    marginBottom: hp(1),
+  modernActionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
   },
-  actionTitle: {
-    fontSize: RFValue(14),
+  modernActionIcon: {
+    marginRight: wp(4),
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: wp(6),
+    padding: wp(2),
+  },
+  modernActionText: {
+    flex: 1,
+  },
+  modernActionTitle: {
+    fontSize: RFValue(16),
     color: 'white',
     fontWeight: 'bold',
-    textAlign: 'center',
     marginBottom: hp(0.5),
   },
-  actionSubtitle: {
-    fontSize: RFValue(11),
-    color: 'rgba(255,255,255,0.8)',
+  modernActionSubtitle: {
+    fontSize: RFValue(12),
+    color: 'rgba(255,255,255,0.7)',
+    lineHeight: RFValue(16),
+  },
+  secondaryActionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  secondaryAction: {
+    flex: 1,
+    marginHorizontal: wp(1),
+    padding: wp(4),
+    minHeight: hp(12),
+  },
+  secondaryActionContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
+  },
+  secondaryActionTitle: {
+    fontSize: RFValue(13),
+    color: 'white',
+    fontWeight: 'bold',
+    marginTop: hp(1),
     textAlign: 'center',
-    lineHeight: RFValue(14),
   },
   recentDreams: {
     paddingHorizontal: wp(5),
   },
-  dreamCard: {
-    marginBottom: hp(1.5),
-    borderRadius: wp(3),
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+  modernDreamCard: {
+    marginBottom: hp(2),
+    borderRadius: wp(4),
+    padding: wp(5),
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 3,
+    },
+    shadowOpacity: 0.27,
+    shadowRadius: 4.65,
   },
-  dreamGradient: {
-    padding: wp(4),
-  },
-  dreamContent: {
+  modernDreamContent: {
     flex: 1,
   },
-  dreamHeader: {
+  modernDreamHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: hp(1),
+    justifyContent: 'space-between',
+    marginBottom: hp(1.5),
   },
-  dreamDate: {
+  dreamIconBadge: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: wp(4),
+    padding: wp(1.5),
+  },
+  modernDreamDate: {
     fontSize: RFValue(12),
-    color: 'rgba(255,255,255,0.7)',
-    marginLeft: wp(2),
-    fontWeight: '500',
+    color: 'white',
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'center',
   },
-  dreamText: {
-    fontSize: RFValue(13),
-    color: 'rgba(255,255,255,0.9)',
-    lineHeight: RFValue(18),
+  dreamTypeBadge: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: wp(3),
+    paddingHorizontal: wp(2),
+    paddingVertical: wp(1),
+  },
+  dreamTypeText: {
+    fontSize: RFValue(10),
+    color: 'white',
+    fontWeight: '600',
+  },
+  modernDreamText: {
+    fontSize: RFValue(14),
+    color: 'white',
+    lineHeight: RFValue(20),
+    marginBottom: hp(1.5),
+  },
+  dreamFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  readMoreText: {
+    fontSize: RFValue(12),
+    color: 'rgba(255,255,255,0.8)',
+    fontWeight: '600',
   },
   bottomSpacing: {
     height: hp(5),

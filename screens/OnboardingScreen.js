@@ -8,6 +8,7 @@ import {
   Animated,
   ScrollView,
   Platform,
+  FlatList,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -48,6 +49,7 @@ export default function OnboardingScreen({ navigation }) {
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
+  const flatListRef = useRef(null);
 
   const animateTransition = (callback) => {
     Animated.parallel([
@@ -80,9 +82,19 @@ export default function OnboardingScreen({ navigation }) {
 
   const handleNext = () => {
     if (currentIndex < onboardingData.length - 1) {
-      animateTransition(() => setCurrentIndex(currentIndex + 1));
+      const nextIndex = currentIndex + 1;
+      flatListRef.current?.scrollToIndex({ index: nextIndex, animated: true });
+      setCurrentIndex(nextIndex);
     } else {
       handleFinish();
+    }
+  };
+
+  const onScroll = (event) => {
+    const slideSize = width;
+    const index = Math.round(event.nativeEvent.contentOffset.x / slideSize);
+    if (index !== currentIndex) {
+      setCurrentIndex(index);
     }
   };
 
@@ -92,30 +104,31 @@ export default function OnboardingScreen({ navigation }) {
 
   const handleFinish = async () => {
     try {
-      // Onboarding durumunu kaydetmeyi kaldırdık
-      // Sadece login ekranına yönlendir
+      // Onboarding tamamlandığını kaydet
+      await AsyncStorage.setItem('hasSeenOnboarding', 'true');
+      // Login ekranına yönlendir
       navigation.replace('Login');
     } catch (error) {
-      console.error('Error navigating to login:', error);
+      console.error('Error saving onboarding status or navigating:', error);
+      // Hata olsa bile login ekranına git
+      navigation.replace('Login');
     }
   };
 
   const currentItem = onboardingData[currentIndex];
 
-  return (
+  const renderItem = ({ item, index }) => (
     <LinearGradient
-      colors={currentItem.gradient}
-      style={styles.container}
+      colors={item.gradient}
+      style={[styles.container, { width }]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
     >
-      <StatusBar style="light" />
-      
       {/* Floating Particles */}
       <View style={styles.particlesContainer}>
-        {currentItem.particles.map((particle, index) => (
+        {item.particles.map((particle, particleIndex) => (
           <Animated.Text
-            key={index}
+            key={particleIndex}
             style={[
               styles.particle,
               {
@@ -129,13 +142,6 @@ export default function OnboardingScreen({ navigation }) {
           </Animated.Text>
         ))}
       </View>
-
-      {/* Skip Button */}
-      <BlurView intensity={20} style={styles.skipButton}>
-        <TouchableOpacity onPress={handleSkip} style={styles.skipTouchable}>
-          <Text style={styles.skipText}>Geç</Text>
-        </TouchableOpacity>
-      </BlurView>
 
       {/* Content */}
       <Animated.View 
@@ -152,13 +158,41 @@ export default function OnboardingScreen({ navigation }) {
             colors={['rgba(255,255,255,0.3)', 'rgba(255,255,255,0.1)']}
             style={styles.iconBackground}
           >
-            <Text style={styles.icon}>{currentItem.icon}</Text>
+            <Text style={styles.icon}>{item.icon}</Text>
           </LinearGradient>
         </View>
         
-        <Text style={styles.title}>{currentItem.title}</Text>
-        <Text style={styles.description}>{currentItem.description}</Text>
+        <Text style={styles.title}>{item.title}</Text>
+        <Text style={styles.description}>{item.description}</Text>
       </Animated.View>
+    </LinearGradient>
+  );
+
+  return (
+    <View style={styles.mainContainer}>
+      <StatusBar style="light" />
+      
+      {/* Skip Button */}
+      <BlurView intensity={20} style={styles.skipButton}>
+        <TouchableOpacity onPress={handleSkip} style={styles.skipTouchable}>
+          <Text style={styles.skipText}>Geç</Text>
+        </TouchableOpacity>
+      </BlurView>
+
+      {/* FlatList for swipeable onboarding */}
+      <FlatList
+        ref={flatListRef}
+        data={onboardingData}
+        renderItem={renderItem}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        keyExtractor={(item) => item.id.toString()}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        bounces={false}
+        style={styles.flatList}
+      />
 
       {/* Bottom Section */}
       <View style={styles.bottomSection}>
@@ -199,12 +233,18 @@ export default function OnboardingScreen({ navigation }) {
           </LinearGradient>
         </TouchableOpacity>
       </View>
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  mainContainer: {
+    flex: 1,
+  },
   container: {
+    flex: 1,
+  },
+  flatList: {
     flex: 1,
   },
   particlesContainer: {
@@ -220,7 +260,7 @@ const styles = StyleSheet.create({
   },
   skipButton: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 60 : 40,
+    top: Platform.OS === 'ios' ? 70 : 50,
     right: 20,
     borderRadius: 20,
     overflow: 'hidden',
@@ -283,9 +323,13 @@ const styles = StyleSheet.create({
     textShadowRadius: 2,
   },
   bottomSection: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     paddingHorizontal: 40,
     paddingBottom: Platform.OS === 'ios' ? 50 : 30,
-    zIndex: 1,
+    zIndex: 10,
   },
   pagination: {
     flexDirection: 'row',
