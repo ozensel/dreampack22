@@ -2,6 +2,8 @@
 
 DreamPack, kullanıcıların rüyalarını kaydetmelerine, kategorilere ayırmalarına ve AI destekli yorumlar almalarına olanak sağlayan modern bir React Native uygulamasıdır.
 
+Bu proje **ICON Yazılım** tarafından geliştirilmektedir.
+
 ## ✨ Özellikler
 
 ### 🔐 Kimlik Doğrulama
